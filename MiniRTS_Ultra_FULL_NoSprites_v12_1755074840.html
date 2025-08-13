@@ -339,9 +339,9 @@ const unitPanel=document.getElementById('unitPanel'), buildingPanel=document.get
 function updateBuildingPanel(){ const selected=players[0].structures.filter(s=>s.selected && !s.isGhost && s.owner===0); if(selected.length!==1){ buildingPanel.style.display='none'; buildingPanel.innerHTML=''; return; } const b=selected[0]; buildingPanel.style.display='flex'; buildingPanel.innerHTML='';
   function add(label,cb){ const btn=document.createElement('button'); btn.className='btn'; btn.textContent=label; btn.onclick=()=>{ cb(); }; buildingPanel.appendChild(btn); }
   if(b.kind==='hq'){ add('Рабочий (🍚50/💧12)', ()=>b.queue.push('worker')); }
-  if(b.kind==='barracks'){ add('Мечник (🍚60/💧24)', ()=>b.queue.push('soldier')); }
-  if(b.kind==='mBarracks'){ add('Маг (🍚80/💧46)', ()=>b.queue.push('mage')); }
-  if(b.kind==='range'){ add('Лучник (🍚70/💧36)', ()=>b.queue.push('archer')); } }
+  if(b.kind==='barracks'){ add('Мечник (🍚60/💧24) [Q]', ()=>b.queue.push('soldier')); }
+  if(b.kind==='mBarracks'){ add('Маг (🍚80/💧46) [E]', ()=>b.queue.push('mage')); }
+  if(b.kind==='range'){ add('Лучник (🍚70/💧36) [X]', ()=>b.queue.push('archer')); } }
 function renderWorkerBuildPanel(){ const selected=players[0].units.filter(u=>u.selected && u.type==='worker'); if(selected.length===0){ workerBuild.style.display='none'; workerBuild.innerHTML=''; return; } workerBuild.style.display='flex'; workerBuild.innerHTML='';
   function add(kind,label,emoji,cb){ const btn=document.createElement('button'); btn.className='btn'; btn.textContent=emoji+' '+label; btn.onclick=()=>{ cb?cb():startBuild(kind); }; workerBuild.appendChild(btn); }
   add('', '⟲ Вернуться к работе [R]','', ()=>resumeWorkers(players[0]));
@@ -472,7 +472,7 @@ window.addEventListener('keydown', e=>{
   if(k==='l') startBuild('range');
   if(k==='h') startBuild('altar');
   if(k==='q'){ const b=players[0].structures.find(s=>s.kind==='barracks' && !s.isGhost && s.owner===0 && s.selected); if(b) b.queue.push('soldier'); }
-  if(k==='w'){ const b=players[0].structures.find(s=>s.kind==='range' && !s.isGhost && s.owner===0 && s.selected); if(b) b.queue.push('archer'); }
+  if(k==='x'){ const b=players[0].structures.find(s=>s.kind==='range' && !s.isGhost && s.owner===0 && s.selected); if(b) b.queue.push('archer'); }
   if(k==='e'){ const b=players[0].structures.find(s=>s.kind==='mBarracks' && !s.isGhost && s.owner===0 && s.selected); if(b) b.queue.push('mage'); }
 });
 
