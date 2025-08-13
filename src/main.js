@@ -15,8 +15,14 @@ function resize() { const w = cvs.clientWidth, h = cvs.clientHeight; cvs.width =
 new ResizeObserver(resize).observe(cvs); resize();
 function screenToWorld(sx, sy) { return { x: sx / world.zoom + world.camX, y: sy / world.zoom + world.camY }; }
 function worldToScreen(wx, wy) { return { x: (wx - world.camX) * world.zoom, y: (wy - world.camY) * world.zoom }; }
+function clampCamera() {
+  const vw = (cvs.width / DPR) / world.zoom;
+  const vh = (cvs.height / DPR) / world.zoom;
+  world.camX = clamp(world.camX, 0, world.width - vw);
+  world.camY = clamp(world.camY, 0, world.height - vh);
+}
 
-Object.assign(globalThis, { clamp, rand, dist2, cvs, ctx, mini, mctx, DPR, world, screenToWorld, worldToScreen });
+Object.assign(globalThis, { clamp, rand, dist2, cvs, ctx, mini, mctx, DPR, world, screenToWorld, worldToScreen, clampCamera });
 
 /* ==== Audio (простые огибающие без внешних файлов) ==== */
 const AC = window.AudioContext ? new AudioContext() : null;
@@ -59,7 +65,7 @@ let simTime = 0;
 
       /* ==== Hero & abilities ==== */
       const abilityBar = document.getElementById('abilityBar'); const abilityDesc = document.getElementById('abilityDesc');
-      const heroName = document.getElementById('heroName'), heroHP = document.getElementById('heroHP'), heroMP = document.getElementById('heroMP'), heroLVL = document.getElementById('heroLVL'); const ab1 = document.getElementById('ab1'), ab2 = document.getElementById('ab2'), ab3 = document.getElementById('ab3'); const invPanel = document.getElementById('invPanel'), invGrid = document.getElementById('invGrid');
+      const heroName = document.getElementById('heroName'), heroHP = document.getElementById('heroHP'), heroMP = document.getElementById('heroMP'), heroLVL = document.getElementById('heroLVL'); const heroExpFill = document.getElementById('heroExpFill'); const ab1 = document.getElementById('ab1'), ab2 = document.getElementById('ab2'), ab3 = document.getElementById('ab3'); const invPanel = document.getElementById('invPanel'), invGrid = document.getElementById('invGrid');
       const abilityInfo = {
         paladin: {
           1: 'Исцеление (40 маны): лечит союзников на 90 HP в радиусе 180.',
@@ -83,7 +89,8 @@ let simTime = 0;
         heroName.textContent = h.heroName + ' (' + h.heroClass + ')';
         heroHP.textContent = `HP ${h.hp | 0}/${h.maxHp | 0}`;
         heroMP.textContent = `MP ${h.mp | 0}/${h.maxMp | 0}`;
-        heroLVL.textContent = 'Lvl ' + h.levelStacks;
+        heroLVL.textContent = 'Lvl ' + (h.level || 1);
+        heroExpFill.style.width = ((h.exp || 0) / (h.expToNext || 1) * 100) + '%';
         const info = abilityInfo[h.heroClass] || {};
         ab1.title = info[1] || '';
         ab2.title = info[2] || '';
@@ -92,7 +99,7 @@ let simTime = 0;
       }
       ab1.onclick = () => tryCast(1); ab2.onclick = () => tryCast(2); ab3.onclick = () => tryCast(3);
       function spawnHero(owner, x, y, cls = null) {
-        const h = new Unit(x, y, owner, 'soldier'); h.isHero = true; h.maxHp = 420; h.hp = 420; h.maxMp = 160; h.mp = 120; h.dps = 50; h.attackRange = 40; h.vision = 560; h.inventory = []; h.levelStacks = 0; h.regen = 0.83; h.mpRegen = 0.8;
+        const h = new Unit(x, y, owner, 'soldier'); h.isHero = true; h.maxHp = 420; h.hp = 420; h.maxMp = 160; h.mp = 120; h.dps = 50; h.attackRange = 40; h.vision = 560; h.inventory = []; h.level = 1; h.exp = 0; h.expToNext = 100; h.regen = 0.83; h.mpRegen = 0.8;
         if (!cls) { const r = Math.random(); cls = r < 0.34 ? 'paladin' : (r < 0.67 ? 'rogue' : 'archmage'); }
         h.heroClass = cls; players[owner].chosenClass = cls;
         if (cls === 'paladin') { h.heroName = 'Паладин'; h.cdM1 = 8; h.cdM2 = 12; h.cdM3 = 16; }
@@ -113,13 +120,26 @@ let simTime = 0;
           });
         });
       }
+      function addHeroExp(hero, amt) {
+        if (!hero || hero.dead) return;
+        hero.exp += amt;
+        while (hero.exp >= hero.expToNext) {
+          hero.exp -= hero.expToNext;
+          hero.expToNext *= 1.4;
+          hero.level = (hero.level || 1) + 1;
+          hero.maxHp *= 1.2; hero.hp = hero.maxHp;
+          hero.dps *= 1.2;
+          hero.speed *= 1.2;
+          hero.regen *= 1.2;
+          hero.attackRange *= 1.2;
+          hero.mpRegen *= 1.2;
+        }
+        if (hero.owner === 0) setHeroUI(hero);
+      }
       function heroGainFromNeutral(owner, tier) {
         const h = players[owner]?.hero; if (!h || h.dead) return;
-        const hpGain = tier === 1 ? 20 : (tier === 2 ? 35 : 60);
-        const dpsGain = tier === 1 ? 3 : (tier === 2 ? 5 : 8);
-        h.maxHp += hpGain; h.hp = Math.min(h.maxHp, h.hp + hpGain);
-        h.dps += dpsGain; h.levelStacks += 1;
-        if (owner === 0) setHeroUI(h);
+        const xp = tier === 1 ? 20 : (tier === 2 ? 40 : 80);
+        addHeroExp(h, xp);
       }
       function renderInventory(hero) {
         if (!hero || hero.dead) { invPanel.style.display = 'none'; invGrid.innerHTML = ''; return; }
@@ -180,6 +200,16 @@ let simTime = 0;
       const buildTip = document.getElementById('buildTip');
       const input = { x: 0, y: 0, wx: 0, wy: 0, keys: {}, buildMode: null, lastClickT: 0, lastClickType: null };
       cvs.addEventListener('mousemove', e => { input.x = e.offsetX; input.y = e.offsetY; const w = screenToWorld(input.x, input.y); input.wx = w.x; input.wy = w.y; });
+      cvs.addEventListener('wheel', e => {
+        e.preventDefault();
+        const mx = e.offsetX, my = e.offsetY;
+        const before = screenToWorld(mx, my);
+        const scale = e.deltaY < 0 ? 1.1 : 0.9;
+        world.zoom = clamp(world.zoom * scale, 0.6, 2.8);
+        world.camX = before.x - mx / world.zoom;
+        world.camY = before.y - my / world.zoom;
+        clampCamera();
+      }, { passive: false });
       cvs.addEventListener('contextmenu', e => { e.preventDefault(); if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; } });
       window.addEventListener('keydown', e => { const k = e.key.toLowerCase(); input.keys[k] = true; if (k === 'f') globalThis.fogEnabled = !globalThis.fogEnabled; if (k === '1') tryCast(1); if (k === '2') tryCast(2); if (k === '3') tryCast(3); if (k === 'u') { const h = players[0].hero; if (h && h.inventory.length) { const it = h.inventory.shift(); applyItem(h, it); renderInventory(h); } } if (k === 'r') { resumeWorkers(players[0]); } });
       window.addEventListener('keyup', e => { input.keys[e.key.toLowerCase()] = false; });
@@ -278,7 +308,7 @@ let simTime = 0;
       }
 
       /* ==== Minimap ==== */
-      mini.addEventListener('click', e => { const r = mini.getBoundingClientRect(); const mx = (e.clientX - r.left) / r.width, my = (e.clientY - r.top) / r.height; world.camX = mx * world.width - (cvs.width / DPR) / world.zoom / 2; world.camY = my * world.height - (cvs.height / DPR) / world.zoom / 2; });
+      mini.addEventListener('click', e => { const r = mini.getBoundingClientRect(); const mx = (e.clientX - r.left) / r.width, my = (e.clientY - r.top) / r.height; world.camX = mx * world.width - (cvs.width / DPR) / world.zoom / 2; world.camY = my * world.height - (cvs.height / DPR) / world.zoom / 2; clampCamera(); });
       function drawMinimap() {
         const img = mctx.createImageData(mini.width, mini.height); for (let y = 0; y < mini.height; y++) { for (let x = 0; x < mini.width; x++) { const idx = (y * mini.width + x) * 4; img.data[idx] = 0; img.data[idx + 1] = 60; img.data[idx + 2] = 10; img.data[idx + 3] = 255; } } mctx.putImageData(img, 0, 0);
         function dot(x, y, col) { mctx.fillStyle = col; mctx.fillRect(x - 1, y - 1, 2, 2); }
@@ -297,6 +327,7 @@ await import("./ai.js");
 
 /* ==== Setup/Reset ==== */
       async function resetGame() {
+        gameEnded = false;
         genBlockers();
         for (const p of players) { p.units.length = 0; p.structures.length = 0; p.hero = null; p.res.rice = 220; p.res.water = 100; p.aiPlan = null; }
         neutral.units.length = 0; drops.length = 0; riceNodes.length = 0; waterNodes.length = 0; explored.fill(0); visible.fill(0); updateRes();
@@ -314,12 +345,32 @@ await import("./ai.js");
         let placed = 0; while (placed < 28) { const x = 200 + Math.random() * (world.width - 400), y = 200 + Math.random() * (world.height - 400); if (!farFromAll(x, y, 1200)) continue; const tier = Math.random() < 0.6 ? 1 : (Math.random() < 0.7 ? 2 : 3); neutral.units.push(new NeutralCreep(x, y, tier)); placed++; }
         // reveal around player
         revealCircle(players[0].structures[0].x, players[0].structures[0].y, 900);
-        world.camX = players[0].structures[0].x - 400; world.camY = players[0].structures[0].y - 300;
+        world.camX = players[0].structures[0].x - 400; world.camY = players[0].structures[0].y - 300; clampCamera();
       }
 globalThis.resetGame = resetGame;
 
       /* ==== Loot & pickup ==== */
       function tryPickup() { for (const p of players) { const h = p.hero; if (h && !h.dead) { for (const d of drops) { if (!d.dead && Math.sqrt(dist2(d.x, d.y, h.x, h.y)) < 28) { if (h.inventory.length < 6) { h.inventory.push(d.kind); d.dead = true; if (p === players[0]) renderInventory(h); } } } } } }
+
+      let gameEnded = false;
+      function endGame(victory) {
+        if (gameEnded) return;
+        gameEnded = true;
+        globalThis.paused = true;
+        document.getElementById('ui').style.display = 'none';
+        document.getElementById('menu').style.display = 'none';
+        abilityBar.style.display = 'none';
+        abilityDesc.style.display = 'none';
+        invPanel.style.display = 'none';
+        globalThis.showEndMenu(victory);
+      }
+      function checkGameEnd() {
+        if (gameEnded) return;
+        const meAlive = players[0].units.length > 0 || players[0].structures.length > 0;
+        if (!meAlive) { endGame(false); return; }
+        const enemiesAlive = players.slice(1).some(p => p.units.length > 0 || p.structures.length > 0);
+        if (!enemiesAlive) endGame(true);
+      }
 
       /* ==== Loop ==== */
       let last = performance.now();
@@ -329,7 +380,7 @@ globalThis.drawHp = drawHp;
         const dt = Math.min(0.033, (t - last) / 1000); last = t; simTime += dt;
         clearVisible(); for (const s of players[0].structures) revealCircle(s.x, s.y, 520); for (const u of players[0].units) revealCircle(u.x, u.y, 480);
         if (!globalThis.paused) {
-          const sp = 900 / world.zoom; if (input.keys['w'] || input.keys['ц']) world.camY -= sp * dt; if (input.keys['s'] || input.keys['ы']) world.camY += sp * dt; if (input.keys['a'] || input.keys['ф']) world.camX -= sp * dt; if (input.keys['d'] || input.keys['в']) world.camX += sp * dt;
+          const sp = 900 / world.zoom; if (input.keys['w'] || input.keys['ц']) world.camY -= sp * dt; if (input.keys['s'] || input.keys['ы']) world.camY += sp * dt; if (input.keys['a'] || input.keys['ф']) world.camX -= sp * dt; if (input.keys['d'] || input.keys['в']) world.camX += sp * dt; clampCamera();
           for (const p of players) { for (const s of p.structures) s.update(dt); for (const u of p.units) u.update(dt); if (p.ai) aiThink(dt, players.indexOf(p)); }
           // нейтралы больше не роняют предметы
           for (const n of neutral.units) { n.update(dt); if (n.dead && !n.awarded) { if (n.lastHitBy != null && n.lastHitBy >= 0) { heroGainFromNeutral(n.lastHitBy, n.tier); } n.awarded = true; } }
@@ -338,8 +389,14 @@ globalThis.drawHp = drawHp;
           for (const pr of projectiles) pr.update(dt);
           for (let i = projectiles.length - 1; i >= 0; i--) if (projectiles[i].dead) projectiles.splice(i, 1);
           tryPickup();
+          for (const pi of [1, 2]) {
+            const enemy = players[pi];
+            for (const u of enemy.units) { if (u.dead && !u.xpGiven && u.lastHitBy === 0) { addHeroExp(players[0].hero, 25); u.xpGiven = true; } }
+            for (const s of enemy.structures) { if (s.dead && !s.xpGiven && s.lastHitBy === 0) { addHeroExp(players[0].hero, 60); s.xpGiven = true; } }
+          }
           // cleanup players lists
           for (const p of [players[0], players[1], players[2]]) { p.units = p.units.filter(u => !u.dead); p.structures = p.structures.filter(s => !s.dead); }
+          checkGameEnd();
         }
         ctx.clearRect(0, 0, cvs.width, cvs.height);
         drawTerrain();
@@ -349,7 +406,7 @@ globalThis.drawHp = drawHp;
         // cursor
         ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); const c = 8; ctx.moveTo(input.x - c, input.y); ctx.lineTo(input.x + c, input.y); ctx.moveTo(input.x, input.y - c); ctx.lineTo(input.x, input.y + c); ctx.stroke();
         drawMinimap();
-        setHeroUI(players[0].hero);
+        if (!gameEnded) setHeroUI(players[0].hero);
         updateRes();
         requestAnimationFrame(loop);
       }
