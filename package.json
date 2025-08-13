@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Нет тестов\" && exit 0" 
+    "test": "node test/ai.test.js"
   },
   "repository": {
     "type": "git",
