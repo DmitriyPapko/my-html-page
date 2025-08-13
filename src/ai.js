@@ -40,7 +40,13 @@ function aiThink(dt, id) {
   }
   // hero farms nearest neutral
   const neutral = globalThis.neutral;
-  const hero = P.hero; if (hero && !hero.dead) { const tgt = nearestNeutralCamp(P); if (tgt) { hero.setTarget(tgt); } }
+  const hero = P.hero;
+  if (hero && !hero.dead) {
+    const tgt = nearestNeutralCamp(P);
+    if (tgt) {
+      hero.setTarget(tgt);
+    }
+  }
   // army rally / attack
   if (P.units.filter(u => u.type !== 'worker' && !u.isHero).length >= P.aiPlan.pushAt) {
     const enemyHero = players[0].hero && !players[0].hero.dead ? players[0].hero : null;
@@ -51,6 +57,19 @@ function aiThink(dt, id) {
 function nearestNeutralCamp(P) {
   const neutral = globalThis.neutral;
   const { dist2 } = globalThis;
-  let best = null, bd = 1e9; for (const n of neutral.units) { if (n.dead) continue; const d = dist2(P.structures[0].x, P.structures[0].y, n.x, n.y); if (d < bd) { bd = d; best = n; } } return best;
+  if (!P.structures.length) {
+    console.warn('nearestNeutralCamp: no structures available');
+    return null;
+  }
+  let best = null, bd = 1e9;
+  for (const n of neutral.units) {
+    if (n.dead) continue;
+    const d = dist2(P.structures[0].x, P.structures[0].y, n.x, n.y);
+    if (d < bd) {
+      bd = d;
+      best = n;
+    }
+  }
+  return best;
 }
 Object.assign(globalThis, { aiInitPlan, aiThink, nearestNeutralCamp });
