@@ -50,8 +50,8 @@ export class Unit extends Entity {
     super(x, y, owner);
     this.type = type;
     this.radius = 12;
-    this.speed = 190;
-    this.baseSpeed = 190;
+    this.speed = 150;
+    this.baseSpeed = 150;
     this.destX = x;
     this.destY = y;
     this.attackRange = 28;
@@ -83,6 +83,8 @@ export class Unit extends Entity {
     this.regen = 0.25;
     this.auraTimer = 0;
     this.buildTargetId = null;
+    this.noteTimer = 0;
+    this.nodeId = null;
   }
   setDest(x, y) {
     this.destX = x;
@@ -101,9 +103,15 @@ export class Unit extends Entity {
     if (this.role !== 'rice' && this.role !== 'water') return;
     const P = globalThis.players[this.owner];
     const HQ = P.structures.find(s => s.kind === 'hq');
-    if (!HQ) { this.state = 'idle'; return; }
+    if (!HQ) { this.state = 'idle'; this.noteTimer = 2; return; }
     const node = (this.role === 'rice' ? nearestNode('rice', P) : nearestNode('water', P));
-    if (!node) { this.state = 'idle'; return; }
+    if (!node) { this.state = 'idle'; this.noteTimer = 2; this.nodeId = null; return; }
+    if (this.nodeId !== node.id && this.state !== 'to_hq') {
+      this.nodeId = node.id;
+      this.state = 'to_node';
+      this.destX = node.x + globalThis.rand(-24, 24);
+      this.destY = node.y + globalThis.rand(-24, 24);
+    }
     if (this.state === 'idle') {
       this.state = 'to_node';
       this.destX = node.x + globalThis.rand(-24, 24);
@@ -199,6 +207,7 @@ export class Unit extends Entity {
     if (this.speedBuff > 0) { this.speedBuff = Math.max(0, this.speedBuff - dt); }
     if (this.slow > 0) { this.slow = Math.max(0, this.slow - dt); }
     if (this.summonTimer > 0) { this.summonTimer -= dt; if (this.summonTimer <= 0) { this.dead = true; } }
+    if (this.noteTimer > 0) { this.noteTimer = Math.max(0, this.noteTimer - dt); }
     if (this.state === 'build') {
       const target = getById(this.buildTargetId);
       if (!target || !target.isGhost) { this.state = 'idle'; this.buildTargetId = null; }
@@ -252,6 +261,11 @@ export class Unit extends Entity {
       globalThis.ctx.beginPath();
       globalThis.ctx.arc(s.x, s.y, 16 * globalThis.world.zoom, 0, 6.283);
       globalThis.ctx.stroke();
+    }
+    if (this.noteTimer > 0 && this.type === 'worker') {
+      globalThis.ctx.fillStyle = '#ffd27a';
+      globalThis.ctx.font = `${12 * globalThis.world.zoom}px sans-serif`;
+      globalThis.ctx.fillText('!', s.x - 3 * globalThis.world.zoom, s.y - 20 * globalThis.world.zoom);
     }
   }
 }

@@ -80,9 +80,14 @@ function drawWeather(dt) {
         { name: 'AI‑2', color: '#ffd27a', res: { rice: 220, water: 100 }, units: [], structures: [], hero: null, ai: true, aiPlan: null }
       ];
       const riceNodes = [], waterNodes = [];
-      const resUI = { rice: document.getElementById('resRice'), water: document.getElementById('resWater'), pop: document.getElementById('pop') };
+      const resUI = { rice: document.getElementById('resRice'), water: document.getElementById('resWater'), pop: document.getElementById('pop'), idle: document.getElementById('idleWorkers') };
       const POP_CAP = 20;
-      function updateRes() { resUI.rice.textContent = players[0].res.rice | 0; resUI.water.textContent = players[0].res.water | 0; resUI.pop.textContent = players[0].units.filter(u => !u.dead && !u.isHero).length; }
+      function updateRes() {
+        resUI.rice.textContent = players[0].res.rice | 0;
+        resUI.water.textContent = players[0].res.water | 0;
+        resUI.pop.textContent = players[0].units.filter(u => !u.dead && !u.isHero).length;
+        resUI.idle.textContent = players[0].units.filter(u => u.type === 'worker' && u.state === 'idle').length;
+      }
 
       /* ==== Training & buildings ==== */
       const COSTS = { barracks: { rice: 180, water: 70 }, mBarracks: { rice: 220, water: 110 }, well: { rice: 140, water: 0 }, range: { rice: 160, water: 80 }, altar: { rice: 200, water: 140 } };
@@ -121,7 +126,8 @@ function drawWeather(dt) {
         }
       };
       function setHeroUI(h) {
-        if (!h) { heroPanel.style.display = 'none'; invPanel.style.display = 'none'; return; }
+        const othersSel = players[0].units.some(u => u.selected && u !== h) || players[0].structures.some(s => s.selected);
+        if (!h || h.dead || !h.selected || othersSel) { heroPanel.style.display = 'none'; invPanel.style.display = 'none'; return; }
         heroPanel.style.display = 'block'; invPanel.style.display = 'block';
         heroName.textContent = h.heroName + ' (' + h.heroClass + ')';
         heroHP.textContent = `HP ${h.hp | 0}/${h.maxHp | 0}`;
@@ -234,8 +240,13 @@ function drawWeather(dt) {
 
       /* ==== Input & selection ==== */
       const buildTip = document.getElementById('buildTip');
-      const input = { x: 0, y: 0, wx: 0, wy: 0, keys: {}, buildMode: null, lastClickT: 0, lastClickType: null };
-      cvs.addEventListener('mousemove', e => { input.x = e.offsetX; input.y = e.offsetY; const w = screenToWorld(input.x, input.y); input.wx = w.x; input.wy = w.y; });
+      const input = { x: 0, y: 0, wx: 0, wy: 0, keys: {}, buildMode: null, lastClickT: 0, lastClickType: null, rDown: false, rectStartX: 0, rectStartY: 0, rectStartWX: 0, rectStartWY: 0, rectSelecting: false };
+      cvs.addEventListener('mousemove', e => {
+        input.x = e.offsetX; input.y = e.offsetY; const w = screenToWorld(input.x, input.y); input.wx = w.x; input.wy = w.y;
+        if (input.rDown && !input.rectSelecting) {
+          if (Math.abs(e.offsetX - input.rectStartX) > 4 || Math.abs(e.offsetY - input.rectStartY) > 4) input.rectSelecting = true;
+        }
+      });
       cvs.addEventListener('contextmenu', e => { e.preventDefault(); if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; } });
       window.addEventListener('keydown', e => { const k = e.key.toLowerCase(); input.keys[k] = true; if (k === 'f') globalThis.fogEnabled = !globalThis.fogEnabled; if (k === '1') tryCast(1); if (k === '2') tryCast(2); if (k === '3') tryCast(3); if (k === 'u') { const h = players[0].hero; if (h && h.inventory.length) { const it = h.inventory.shift(); applyItem(h, it); renderInventory(h); } } if (k === 'r') { resumeWorkers(players[0]); } });
       window.addEventListener('keyup', e => { input.keys[e.key.toLowerCase()] = false; });
@@ -264,20 +275,44 @@ function drawWeather(dt) {
           }
           updatePanels();
         } else if (e.button === 2) {
-          if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; return; }
-          const sel = players[0].units.filter(u => u.selected && !u.dead);
-          const tgt = entityAt(input.wx, input.wy);
-          if (sel.length === 0 && tgt && tgt.owner === 0) {
-            unselectAll(); tgt.selected = true; updatePanels(); return;
+          input.rDown = true;
+          input.rectStartX = e.offsetX;
+          input.rectStartY = e.offsetY;
+          input.rectStartWX = input.wx;
+          input.rectStartWY = input.wy;
+        }
+      });
+
+      cvs.addEventListener('mouseup', e => {
+        if (e.button === 2) {
+          e.preventDefault();
+          if (input.rectSelecting) {
+            const x1 = Math.min(input.rectStartWX, input.wx), y1 = Math.min(input.rectStartWY, input.wy);
+            const x2 = Math.max(input.rectStartWX, input.wx), y2 = Math.max(input.rectStartWY, input.wy);
+            if (!e.shiftKey) unselectAll();
+            for (const u of players[0].units) {
+              if (u.dead) continue;
+              if (u.x >= x1 && u.x <= x2 && u.y >= y1 && u.y <= y2) u.selected = true;
+            }
+            updatePanels();
+          } else {
+            if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; input.rDown = false; return; }
+            const sel = players[0].units.filter(u => u.selected && !u.dead);
+            const tgt = entityAt(input.wx, input.wy);
+            if (sel.length === 0 && tgt && tgt.owner === 0) {
+              unselectAll(); tgt.selected = true; updatePanels(); input.rDown = false; return;
+            }
+            if (sel.length) {
+              if (tgt instanceof Structure && tgt.isGhost && sel.some(u => u.type === 'worker')) {
+                sel.filter(u => u.type === 'worker').forEach(w => { w.state = 'build'; w.buildTargetId = tgt.id; });
+              } else if (tgt instanceof ResourceNode && sel.some(u => u.type === 'worker')) {
+                sel.filter(u => u.type === 'worker').forEach(w => { w.role = tgt.type; w.state = 'idle'; });
+              } else if (tgt && tgt.owner !== 0) { sel.forEach(u => u.setTarget(tgt)); }
+              else { sel.forEach((u, i) => u.setDest(input.wx + i * 12, input.wy)); }
+            }
           }
-          if (sel.length) {
-            if (tgt instanceof Structure && tgt.isGhost && sel.some(u => u.type === 'worker')) {
-              sel.filter(u => u.type === 'worker').forEach(w => { w.state = 'build'; w.buildTargetId = tgt.id; });
-            } else if (tgt instanceof ResourceNode && sel.some(u => u.type === 'worker')) {
-              sel.filter(u => u.type === 'worker').forEach(w => { w.role = tgt.type; w.state = 'idle'; });
-            } else if (tgt && tgt.owner !== 0) { sel.forEach(u => u.setTarget(tgt)); }
-            else { sel.forEach((u, i) => u.setDest(input.wx + i * 12, input.wy)); }
-          }
+          input.rDown = false;
+          input.rectSelecting = false;
         }
       });
 
@@ -431,6 +466,14 @@ globalThis.drawHp = drawHp;
         for (const e of drawables) { if (e.draw) e.draw(); }
         drawWeather(dt);
         drawFog();
+        if (input.rectSelecting) {
+          const rx = Math.min(input.rectStartX, input.x);
+          const ry = Math.min(input.rectStartY, input.y);
+          const rw = Math.abs(input.rectStartX - input.x);
+          const rh = Math.abs(input.rectStartY - input.y);
+          ctx.strokeStyle = '#7ac8ff';
+          ctx.strokeRect(rx, ry, rw, rh);
+        }
         // cursor
         ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); const c = 8; ctx.moveTo(input.x - c, input.y); ctx.lineTo(input.x + c, input.y); ctx.moveTo(input.x, input.y - c); ctx.lineTo(input.x, input.y + c); ctx.stroke();
         drawMinimap();
