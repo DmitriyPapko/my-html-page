@@ -9,6 +9,12 @@ const resultMenu = document.getElementById('resultMenu');
 const resultText = document.getElementById('resultText');
 const btnResultRestart = document.getElementById('btnResultRestart');
 
+const uiBar = document.getElementById('ui');
+const idleWrap = document.createElement('span');
+idleWrap.className = 'pill';
+idleWrap.innerHTML = '⏳ Безд.: <span id="idleWorkers">0</span>';
+uiBar.insertBefore(idleWrap, btnFog);
+
 globalThis.paused = true;
 globalThis.muted = false;
 globalThis.fogEnabled = true;

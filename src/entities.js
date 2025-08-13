@@ -50,8 +50,8 @@ export class Unit extends Entity {
     super(x, y, owner);
     this.type = type;
     this.radius = 12;
-    this.speed = 190;
-    this.baseSpeed = 190;
+    this.speed = 150;
+    this.baseSpeed = 150;
     this.destX = x;
     this.destY = y;
     this.attackRange = 28;
@@ -83,6 +83,8 @@ export class Unit extends Entity {
     this.regen = 0.25;
     this.auraTimer = 0;
     this.buildTargetId = null;
+    this.nodeId = null;
+    this.noticeTimer = 0;
   }
   setDest(x, y) {
     this.destX = x;
@@ -101,11 +103,27 @@ export class Unit extends Entity {
     if (this.role !== 'rice' && this.role !== 'water') return;
     const P = globalThis.players[this.owner];
     const HQ = P.structures.find(s => s.kind === 'hq');
-    if (!HQ) { this.state = 'idle'; return; }
+    if (!HQ) {
+      this.state = 'idle';
+      this.nodeId = null;
+      this.noticeTimer = 2.0;
+      return;
+    }
     const node = (this.role === 'rice' ? nearestNode('rice', P) : nearestNode('water', P));
-    if (!node) { this.state = 'idle'; return; }
-    if (this.state === 'idle') {
+    if (!node) {
+      this.state = 'idle';
+      this.nodeId = null;
+      this.noticeTimer = 2.0;
+      return;
+    }
+    if (this.nodeId !== node.id && this.state !== 'to_hq') {
+      this.nodeId = node.id;
       this.state = 'to_node';
+      this.destX = node.x + globalThis.rand(-24, 24);
+      this.destY = node.y + globalThis.rand(-24, 24);
+    } else if (this.state === 'idle') {
+      this.state = 'to_node';
+      this.nodeId = node.id;
       this.destX = node.x + globalThis.rand(-24, 24);
       this.destY = node.y + globalThis.rand(-24, 24);
     }
@@ -141,6 +159,7 @@ export class Unit extends Entity {
           this.carry = 0;
         }
         this.state = 'to_node';
+        this.nodeId = node.id;
         this.destX = node.x + globalThis.rand(-24, 24);
         this.destY = node.y + globalThis.rand(-24, 24);
       }
@@ -192,6 +211,7 @@ export class Unit extends Entity {
     if (this.mp < this.maxMp) {
       this.mp = Math.min(this.maxMp, this.mp + this.mpRegen * dt * 60);
     }
+    if (this.noticeTimer > 0) { this.noticeTimer = Math.max(0, this.noticeTimer - dt); }
     if (this.auraTimer > 0) { this.auraTimer = Math.max(0, this.auraTimer - dt); }
     this.cd1 = Math.max(0, this.cd1 - dt);
     this.cd2 = Math.max(0, this.cd2 - dt);
@@ -246,6 +266,11 @@ export class Unit extends Entity {
       globalThis.ctx.beginPath();
       globalThis.ctx.arc(s.x, s.y, 14 * globalThis.world.zoom, 0, 6.283);
       globalThis.ctx.stroke();
+    }
+    if (this.noticeTimer > 0) {
+      globalThis.ctx.fillStyle = '#ffd27a';
+      globalThis.ctx.font = `${14 * globalThis.world.zoom}px system-ui`;
+      globalThis.ctx.fillText('!', s.x - 4 * globalThis.world.zoom, s.y - 24 * globalThis.world.zoom);
     }
     if (this.selected) {
       globalThis.ctx.strokeStyle = '#7ac8ff';
@@ -379,7 +404,7 @@ export class NeutralCreep extends Entity {
     this.vision = 280 + 40 * (this.tier - 1);
     this.awarded = false;
     this.regen = 0.2;
-    this.baseSpeed = 80;
+    this.baseSpeed = 60;
   }
   damage(n, killerOwner = null) {
     if (this.kind === 'gnome' && Math.random() < 0.25) n *= 0.5;
