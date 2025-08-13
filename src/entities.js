@@ -101,8 +101,9 @@ export class Unit extends Entity {
     if (this.role !== 'rice' && this.role !== 'water') return;
     const P = globalThis.players[this.owner];
     const HQ = P.structures.find(s => s.kind === 'hq');
+    if (!HQ) { this.state = 'idle'; return; }
     const node = (this.role === 'rice' ? nearestNode('rice', P) : nearestNode('water', P));
-    if (!HQ || !node) return;
+    if (!node) { this.state = 'idle'; return; }
     if (this.state === 'idle') {
       this.state = 'to_node';
       this.destX = node.x + globalThis.rand(-24, 24);
@@ -457,6 +458,7 @@ export function allStructures() {
 
 export function nearestNode(type, P) {
   const arr = (type === 'rice' ? globalThis.riceNodes : globalThis.waterNodes);
+  if (!P.structures || P.structures.length === 0) return null;
   let best = null, bd = 1e9;
   for (const n of arr) {
     const d = globalThis.dist2(P.structures[0].x, P.structures[0].y, n.x, n.y);
