@@ -97,4 +97,10 @@ function nearestNeutralCamp(P, neutral, dist2) {
   }
   return best;
 }
-module.exports = { aiInitPlan, aiThink, nearestNeutralCamp };
+  if (typeof module !== 'undefined' && module.exports) {
+    // Node.js/TEST environment
+    module.exports = { aiInitPlan, aiThink, nearestNeutralCamp };
+  } else {
+    // Browser environment - expose to global scope
+    Object.assign(globalThis, { aiInitPlan, aiThink, nearestNeutralCamp });
+  }
