@@ -15,8 +15,10 @@ function resize() { const w = cvs.clientWidth, h = cvs.clientHeight; cvs.width =
 new ResizeObserver(resize).observe(cvs); resize();
 function screenToWorld(sx, sy) { return { x: sx / world.zoom + world.camX, y: sy / world.zoom + world.camY }; }
 function worldToScreen(wx, wy) { return { x: (wx - world.camX) * world.zoom, y: (wy - world.camY) * world.zoom }; }
+function clampCam() { const maxX = world.width - cvs.width / DPR / world.zoom, maxY = world.height - cvs.height / DPR / world.zoom; world.camX = clamp(world.camX, 0, Math.max(0, maxX)); world.camY = clamp(world.camY, 0, Math.max(0, maxY)); }
+function drawRain(dt) { ctx.strokeStyle = 'rgba(180,180,255,0.5)'; ctx.beginPath(); for (const p of rain) { p.x += p.vx * dt; p.y += p.v * dt; if (p.y > cvs.height) { p.y = -10; p.x = Math.random() * cvs.width; } if (p.x < 0) p.x += cvs.width; ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + p.vx * 0.05, p.y + 6); } ctx.stroke(); }
 
-Object.assign(globalThis, { clamp, rand, dist2, cvs, ctx, mini, mctx, DPR, world, screenToWorld, worldToScreen });
+Object.assign(globalThis, { clamp, rand, dist2, cvs, ctx, mini, mctx, DPR, world, screenToWorld, worldToScreen, clampCam });
 
 /* ==== Audio (простые огибающие без внешних файлов) ==== */
 const AC = window.AudioContext ? new AudioContext() : null;
@@ -29,6 +31,8 @@ function beep(freq = 440, dur = 0.08, type = 'triangle', gain = 0.06) {
 globalThis.beep = beep;
 let simTime = 0;
       const neutral = { units: [] }, drops = [], projectiles = [];
+      let weather = 'sun';
+      const rain = [];
 
       /* ==== Players & economy ==== */
       const players = [
@@ -59,7 +63,7 @@ let simTime = 0;
 
       /* ==== Hero & abilities ==== */
       const abilityBar = document.getElementById('abilityBar'); const abilityDesc = document.getElementById('abilityDesc');
-      const heroName = document.getElementById('heroName'), heroHP = document.getElementById('heroHP'), heroMP = document.getElementById('heroMP'), heroLVL = document.getElementById('heroLVL'); const ab1 = document.getElementById('ab1'), ab2 = document.getElementById('ab2'), ab3 = document.getElementById('ab3'); const invPanel = document.getElementById('invPanel'), invGrid = document.getElementById('invGrid');
+      const heroName = document.getElementById('heroName'), heroHP = document.getElementById('heroHP'), heroMP = document.getElementById('heroMP'), heroLVL = document.getElementById('heroLVL'), expFill = document.getElementById('expFill'); const ab1 = document.getElementById('ab1'), ab2 = document.getElementById('ab2'), ab3 = document.getElementById('ab3'); const invPanel = document.getElementById('invPanel'), invGrid = document.getElementById('invGrid');
       const abilityInfo = {
         paladin: {
           1: 'Исцеление (40 маны): лечит союзников на 90 HP в радиусе 180.',
@@ -78,12 +82,13 @@ let simTime = 0;
         }
       };
       function setHeroUI(h) {
-        if (!h) { abilityBar.style.display = 'none'; abilityDesc.style.display = 'none'; invPanel.style.display = 'none'; return; }
+        if (!h) { abilityBar.style.display = 'none'; abilityDesc.style.display = 'none'; invPanel.style.display = 'none'; expFill.style.width = '0%'; return; }
         abilityBar.style.display = 'block'; abilityDesc.style.display = 'block'; invPanel.style.display = 'block';
         heroName.textContent = h.heroName + ' (' + h.heroClass + ')';
         heroHP.textContent = `HP ${h.hp | 0}/${h.maxHp | 0}`;
         heroMP.textContent = `MP ${h.mp | 0}/${h.maxMp | 0}`;
-        heroLVL.textContent = 'Lvl ' + h.levelStacks;
+        heroLVL.textContent = 'Lvl ' + h.level;
+        expFill.style.width = (h.exp / h.expToNext * 100) + '%';
         const info = abilityInfo[h.heroClass] || {};
         ab1.title = info[1] || '';
         ab2.title = info[2] || '';
@@ -92,7 +97,7 @@ let simTime = 0;
       }
       ab1.onclick = () => tryCast(1); ab2.onclick = () => tryCast(2); ab3.onclick = () => tryCast(3);
       function spawnHero(owner, x, y, cls = null) {
-        const h = new Unit(x, y, owner, 'soldier'); h.isHero = true; h.maxHp = 420; h.hp = 420; h.maxMp = 160; h.mp = 120; h.dps = 50; h.attackRange = 40; h.vision = 560; h.inventory = []; h.levelStacks = 0; h.regen = 0.83; h.mpRegen = 0.8;
+        const h = new Unit(x, y, owner, 'soldier'); h.isHero = true; h.maxHp = 420; h.hp = 420; h.maxMp = 160; h.mp = 120; h.dps = 50; h.attackRange = 40; h.vision = 560; h.inventory = []; h.level = 1; h.exp = 0; h.expToNext = 100; h.regen = 0.83; h.mpRegen = 0.8;
         if (!cls) { const r = Math.random(); cls = r < 0.34 ? 'paladin' : (r < 0.67 ? 'rogue' : 'archmage'); }
         h.heroClass = cls; players[owner].chosenClass = cls;
         if (cls === 'paladin') { h.heroName = 'Паладин'; h.cdM1 = 8; h.cdM2 = 12; h.cdM3 = 16; }
@@ -113,12 +118,20 @@ let simTime = 0;
           });
         });
       }
-      function heroGainFromNeutral(owner, tier) {
+      function heroGainExp(owner, amount) {
         const h = players[owner]?.hero; if (!h || h.dead) return;
-        const hpGain = tier === 1 ? 20 : (tier === 2 ? 35 : 60);
-        const dpsGain = tier === 1 ? 3 : (tier === 2 ? 5 : 8);
-        h.maxHp += hpGain; h.hp = Math.min(h.maxHp, h.hp + hpGain);
-        h.dps += dpsGain; h.levelStacks += 1;
+        h.exp += amount;
+        while (h.exp >= h.expToNext) {
+          h.exp -= h.expToNext;
+          h.level += 1;
+          h.maxHp *= 1.2; h.hp = h.maxHp;
+          h.dps *= 1.2;
+          h.baseSpeed *= 1.2; h.speed = h.baseSpeed;
+          h.regen *= 1.2;
+          h.attackRange *= 1.2;
+          h.maxMp *= 1.2; h.mp = h.maxMp;
+          h.mpRegen *= 1.2;
+        }
         if (owner === 0) setHeroUI(h);
       }
       function renderInventory(hero) {
@@ -180,6 +193,7 @@ let simTime = 0;
       const buildTip = document.getElementById('buildTip');
       const input = { x: 0, y: 0, wx: 0, wy: 0, keys: {}, buildMode: null, lastClickT: 0, lastClickType: null };
       cvs.addEventListener('mousemove', e => { input.x = e.offsetX; input.y = e.offsetY; const w = screenToWorld(input.x, input.y); input.wx = w.x; input.wy = w.y; });
+      cvs.addEventListener('wheel', e => { e.preventDefault(); const old = world.zoom; const factor = e.deltaY < 0 ? 1.1 : 0.9; world.zoom = clamp(old * factor, 0.6, 2.8); const wx1 = world.camX + e.offsetX / old; const wy1 = world.camY + e.offsetY / old; const wx2 = world.camX + e.offsetX / world.zoom; const wy2 = world.camY + e.offsetY / world.zoom; world.camX += wx1 - wx2; world.camY += wy1 - wy2; clampCam(); }, { passive: false });
       cvs.addEventListener('contextmenu', e => { e.preventDefault(); if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; } });
       window.addEventListener('keydown', e => { const k = e.key.toLowerCase(); input.keys[k] = true; if (k === 'f') globalThis.fogEnabled = !globalThis.fogEnabled; if (k === '1') tryCast(1); if (k === '2') tryCast(2); if (k === '3') tryCast(3); if (k === 'u') { const h = players[0].hero; if (h && h.inventory.length) { const it = h.inventory.shift(); applyItem(h, it); renderInventory(h); } } if (k === 'r') { resumeWorkers(players[0]); } });
       window.addEventListener('keyup', e => { input.keys[e.key.toLowerCase()] = false; });
@@ -278,7 +292,7 @@ let simTime = 0;
       }
 
       /* ==== Minimap ==== */
-      mini.addEventListener('click', e => { const r = mini.getBoundingClientRect(); const mx = (e.clientX - r.left) / r.width, my = (e.clientY - r.top) / r.height; world.camX = mx * world.width - (cvs.width / DPR) / world.zoom / 2; world.camY = my * world.height - (cvs.height / DPR) / world.zoom / 2; });
+      mini.addEventListener('click', e => { const r = mini.getBoundingClientRect(); const mx = (e.clientX - r.left) / r.width, my = (e.clientY - r.top) / r.height; world.camX = mx * world.width - (cvs.width / DPR) / world.zoom / 2; world.camY = my * world.height - (cvs.height / DPR) / world.zoom / 2; clampCam(); });
       function drawMinimap() {
         const img = mctx.createImageData(mini.width, mini.height); for (let y = 0; y < mini.height; y++) { for (let x = 0; x < mini.width; x++) { const idx = (y * mini.width + x) * 4; img.data[idx] = 0; img.data[idx + 1] = 60; img.data[idx + 2] = 10; img.data[idx + 3] = 255; } } mctx.putImageData(img, 0, 0);
         function dot(x, y, col) { mctx.fillStyle = col; mctx.fillRect(x - 1, y - 1, 2, 2); }
@@ -300,6 +314,7 @@ await import("./ai.js");
         genBlockers();
         for (const p of players) { p.units.length = 0; p.structures.length = 0; p.hero = null; p.res.rice = 220; p.res.water = 100; p.aiPlan = null; }
         neutral.units.length = 0; drops.length = 0; riceNodes.length = 0; waterNodes.length = 0; explored.fill(0); visible.fill(0); updateRes();
+        const presets = ['sun','evening','rain']; weather = presets[Math.floor(Math.random()*presets.length)]; rain.length = 0; if (weather === 'rain') { for (let i=0;i<120;i++) rain.push({ x: Math.random()*cvs.width, y: Math.random()*cvs.height, vx: -80 - Math.random()*40, v: 400 + Math.random()*200 }); }
         const pos = [{ x: 900, y: 900 }, { x: world.width - 1200, y: 1200 }, { x: world.width - 1800, y: world.height - 1400 }];
         const playerClass = await chooseHeroClass();
         for (let i = 0; i < 3; i++) {
@@ -311,10 +326,10 @@ await import("./ai.js");
         }
         // neutrals far from starts
         function farFromAll(x, y, dist) { for (const p of players) { const s = p.structures[0]; if (Math.hypot(x - s.x, y - s.y) < dist) return false; } return true; }
-        let placed = 0; while (placed < 28) { const x = 200 + Math.random() * (world.width - 400), y = 200 + Math.random() * (world.height - 400); if (!farFromAll(x, y, 1200)) continue; const tier = Math.random() < 0.6 ? 1 : (Math.random() < 0.7 ? 2 : 3); neutral.units.push(new NeutralCreep(x, y, tier)); placed++; }
+        let camps = 0; while (camps < 8) { const x = 200 + Math.random() * (world.width - 400), y = 200 + Math.random() * (world.height - 400); if (!farFromAll(x, y, 1200)) continue; const size = 3 + Math.floor(Math.random() * 2); for (let j = 0; j < size; j++) { const ang = Math.random() * Math.PI * 2; const r = Math.random() * 80; const nx = x + Math.cos(ang) * r, ny = y + Math.sin(ang) * r; const r2 = Math.random(); const kind = r2 < 0.35 ? 'beast' : r2 < 0.6 ? 'dwarf' : r2 < 0.85 ? 'mage' : 'troll'; neutral.units.push(new NeutralCreep(nx, ny, kind)); } camps++; }
         // reveal around player
         revealCircle(players[0].structures[0].x, players[0].structures[0].y, 900);
-        world.camX = players[0].structures[0].x - 400; world.camY = players[0].structures[0].y - 300;
+        world.camX = players[0].structures[0].x - 400; world.camY = players[0].structures[0].y - 300; clampCam();
       }
 globalThis.resetGame = resetGame;
 
@@ -329,23 +344,29 @@ globalThis.drawHp = drawHp;
         const dt = Math.min(0.033, (t - last) / 1000); last = t; simTime += dt;
         clearVisible(); for (const s of players[0].structures) revealCircle(s.x, s.y, 520); for (const u of players[0].units) revealCircle(u.x, u.y, 480);
         if (!globalThis.paused) {
-          const sp = 900 / world.zoom; if (input.keys['w'] || input.keys['ц']) world.camY -= sp * dt; if (input.keys['s'] || input.keys['ы']) world.camY += sp * dt; if (input.keys['a'] || input.keys['ф']) world.camX -= sp * dt; if (input.keys['d'] || input.keys['в']) world.camX += sp * dt;
+          const sp = 900 / world.zoom; if (input.keys['w'] || input.keys['ц']) world.camY -= sp * dt; if (input.keys['s'] || input.keys['ы']) world.camY += sp * dt; if (input.keys['a'] || input.keys['ф']) world.camX -= sp * dt; if (input.keys['d'] || input.keys['в']) world.camX += sp * dt; clampCam();
           for (const p of players) { for (const s of p.structures) s.update(dt); for (const u of p.units) u.update(dt); if (p.ai) aiThink(dt, players.indexOf(p)); }
-          // нейтралы больше не роняют предметы
-          for (const n of neutral.units) { n.update(dt); if (n.dead && !n.awarded) { if (n.lastHitBy != null && n.lastHitBy >= 0) { heroGainFromNeutral(n.lastHitBy, n.tier); } n.awarded = true; } }
+          for (const n of neutral.units) { n.update(dt); if (n.dead && !n.awarded) { if (n.lastHitBy != null && n.lastHitBy >= 0) { const xpMap = { mage: 18, beast: 22, dwarf: 22, troll: 40 }; heroGainExp(n.lastHitBy, xpMap[n.kind] || 20); } n.awarded = true; } }
           // cleanup neutrals (remove processed corpses)
           for (let i = neutral.units.length - 1; i >= 0; i--) { if (neutral.units[i].dead && neutral.units[i].awarded) { neutral.units.splice(i, 1); } }
           for (const pr of projectiles) pr.update(dt);
           for (let i = projectiles.length - 1; i >= 0; i--) if (projectiles[i].dead) projectiles.splice(i, 1);
           tryPickup();
-          // cleanup players lists
+          for (const p of [players[1], players[2]]) {
+            for (const u of p.units) { if (u.dead && !u.awarded) { if (u.lastHitBy === 0) heroGainExp(0, 15); u.awarded = true; } }
+            for (const s of p.structures) { if (s.dead && !s.awarded) { if (s.lastHitBy === 0) heroGainExp(0, 30); s.awarded = true; } }
+          }
           for (const p of [players[0], players[1], players[2]]) { p.units = p.units.filter(u => !u.dead); p.structures = p.structures.filter(s => !s.dead); }
+          if (players[0].units.length === 0 && players[0].structures.length === 0) { showEndMenu('Вы проиграли'); }
+          else if (players[1].units.length === 0 && players[1].structures.length === 0 && players[2].units.length === 0 && players[2].structures.length === 0) { showEndMenu('Победа'); }
         }
         ctx.clearRect(0, 0, cvs.width, cvs.height);
         drawTerrain();
         const drawables = allStructures().concat(allUnits(), neutral.units, projectiles, riceNodes, waterNodes, drops); drawables.sort((a, b) => a.y - b.y);
         for (const e of drawables) { if (e.draw) e.draw(); }
         drawFog();
+        if (weather === 'evening') { ctx.fillStyle = 'rgba(180,100,40,0.15)'; ctx.fillRect(0,0,cvs.width,cvs.height); }
+        if (weather === 'rain') { ctx.fillStyle = 'rgba(80,80,120,0.15)'; ctx.fillRect(0,0,cvs.width,cvs.height); drawRain(dt); }
         // cursor
         ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); const c = 8; ctx.moveTo(input.x - c, input.y); ctx.lineTo(input.x + c, input.y); ctx.moveTo(input.x, input.y - c); ctx.lineTo(input.x, input.y + c); ctx.stroke();
         drawMinimap();
