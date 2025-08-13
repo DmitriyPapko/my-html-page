@@ -83,21 +83,6 @@
       min-width: 620px
     }
 
-    #expContainer {
-      height: 6px;
-      background: rgba(255,255,255,.15);
-      margin: 4px 0 8px;
-      border: 1px solid rgba(255,255,255,.2);
-      border-radius: 4px;
-      overflow: hidden;
-    }
-
-    #expFill {
-      height: 100%;
-      width: 0%;
-      background: #6bf;
-    }
-
     #abilityDesc {
       left: 50%;
       transform: translateX(-50%);
@@ -216,22 +201,4 @@
       border-radius: 16px;
       border: 1px solid rgba(255, 255, 255, .1);
       max-width: 900px
-    }
-
-    #endMenu .card {
-      background: rgba(0, 0, 0, .6);
-      padding: 22px 26px;
-      border-radius: 16px;
-      border: 1px solid rgba(255, 255, 255, .1);
-      max-width: 900px;
-    }
-
-    #endMenu {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0,0,0,.8);
-      z-index: 110;
     }
