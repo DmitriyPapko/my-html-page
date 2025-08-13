@@ -1,4 +1,4 @@
-import "./sprites.js";
+import { drawSprite } from "./sprites.js";
 import { Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, getById, enemiesFor, allUnits, allStructures, nearestNode, lootFromTier } from "./entities.js";
 
 /* ==== Helpers ==== */
@@ -9,6 +9,7 @@ const dist2 = (x1, y1, x2, y2) => { const dx = x2 - x1, dy = y2 - y1; return dx 
 /* ==== Canvas & camera ==== */
 const cvs = document.getElementById('game'), ctx = cvs.getContext('2d'); ctx.imageSmoothingEnabled = false;
 const mini = document.getElementById('minimap'), mctx = mini.getContext('2d'); mctx.imageSmoothingEnabled = false;
+globalThis.drawSprite = (name, x, y, scale = 1, override = {}) => drawSprite(ctx, name, x, y, { scale, override });
 const DPR = Math.max(1, window.devicePixelRatio || 1);
 const world = { width: 12000, height: 8000, camX: 0, camY: 0, zoom: 1.25 };
 function resize() { const w = cvs.clientWidth, h = cvs.clientHeight; cvs.width = Math.floor(w * DPR); cvs.height = Math.floor(h * DPR); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
@@ -31,7 +32,9 @@ cvs.addEventListener('wheel', e => {
   clampCam();
 }, { passive: false });
 
-Object.assign(globalThis, { clamp, rand, dist2, cvs, ctx, mini, mctx, DPR, world, screenToWorld, worldToScreen, clampCam });
+function toPixel(v) { return Math.round(v * DPR) / DPR; }
+function drawShadow(x, y, r) { ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(toPixel(x), toPixel(y), r, r * 0.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+Object.assign(globalThis, { clamp, rand, dist2, cvs, ctx, mini, mctx, DPR, world, screenToWorld, worldToScreen, clampCam, toPixel, drawShadow });
 
 /* ==== Audio (простые огибающие без внешних файлов) ==== */
 const AC = window.AudioContext ? new AudioContext() : null;
@@ -240,10 +243,10 @@ function drawWeather(dt) {
 
       /* ==== Input & selection ==== */
       const buildTip = document.getElementById('buildTip');
-      const input = { x: 0, y: 0, wx: 0, wy: 0, keys: {}, buildMode: null, lastClickT: 0, lastClickType: null, rDown: false, rectStartX: 0, rectStartY: 0, rectStartWX: 0, rectStartWY: 0, rectSelecting: false };
+      const input = { x: 0, y: 0, wx: 0, wy: 0, keys: {}, buildMode: null, lastClickT: 0, lastClickType: null, lDown: false, rectStartX: 0, rectStartY: 0, rectStartWX: 0, rectStartWY: 0, rectSelecting: false };
       cvs.addEventListener('mousemove', e => {
         input.x = e.offsetX; input.y = e.offsetY; const w = screenToWorld(input.x, input.y); input.wx = w.x; input.wy = w.y;
-        if (input.rDown && !input.rectSelecting) {
+        if (input.lDown && !input.rectSelecting) {
           if (Math.abs(e.offsetX - input.rectStartX) > 4 || Math.abs(e.offsetY - input.rectStartY) > 4) input.rectSelecting = true;
         }
       });
@@ -264,28 +267,19 @@ function drawWeather(dt) {
 
       cvs.addEventListener('mousedown', e => {
         if (e.button === 0) {
-          const now = performance.now();
-          if (input.buildMode) { const ok = placeGhost(0, input.wx, input.wy, input.buildMode); if (ok) { input.buildMode = null; buildTip.style.display = 'none'; } return; }
-          const hit = entityAt(input.wx, input.wy);
-          if (!e.shiftKey) unselectAll();
-          if (hit) {
-            hit.selected = true;
-            if (now - input.lastClickT < 300 && input.lastClickType === hit.type) { selectSameTypeOnScreen(hit.type); }
-            input.lastClickType = hit.type; input.lastClickT = now;
-          }
-          updatePanels();
-        } else if (e.button === 2) {
-          input.rDown = true;
+          input.lDown = true;
           input.rectStartX = e.offsetX;
           input.rectStartY = e.offsetY;
           input.rectStartWX = input.wx;
           input.rectStartWY = input.wy;
+        } else if (e.button === 2) {
+          e.preventDefault();
+          if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; }
         }
       });
 
       cvs.addEventListener('mouseup', e => {
-        if (e.button === 2) {
-          e.preventDefault();
+        if (e.button === 0) {
           if (input.rectSelecting) {
             const x1 = Math.min(input.rectStartWX, input.wx), y1 = Math.min(input.rectStartWY, input.wy);
             const x2 = Math.max(input.rectStartWX, input.wx), y2 = Math.max(input.rectStartWY, input.wy);
@@ -296,23 +290,37 @@ function drawWeather(dt) {
             }
             updatePanels();
           } else {
-            if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; input.rDown = false; return; }
-            const sel = players[0].units.filter(u => u.selected && !u.dead);
-            const tgt = entityAt(input.wx, input.wy);
-            if (sel.length === 0 && tgt && tgt.owner === 0) {
-              unselectAll(); tgt.selected = true; updatePanels(); input.rDown = false; return;
-            }
-            if (sel.length) {
-              if (tgt instanceof Structure && tgt.isGhost && sel.some(u => u.type === 'worker')) {
-                sel.filter(u => u.type === 'worker').forEach(w => { w.state = 'build'; w.buildTargetId = tgt.id; });
-              } else if (tgt instanceof ResourceNode && sel.some(u => u.type === 'worker')) {
-                sel.filter(u => u.type === 'worker').forEach(w => { w.role = tgt.type; w.state = 'idle'; });
-              } else if (tgt && tgt.owner !== 0) { sel.forEach(u => u.setTarget(tgt)); }
-              else { sel.forEach((u, i) => u.setDest(input.wx + i * 12, input.wy)); }
+            if (input.buildMode) {
+              const ok = placeGhost(0, input.wx, input.wy, input.buildMode);
+              if (ok) { input.buildMode = null; buildTip.style.display = 'none'; }
+            } else {
+              const hit = entityAt(input.wx, input.wy);
+              const now = performance.now();
+              if (hit) {
+                if (!e.shiftKey) unselectAll();
+                hit.selected = true;
+                if (now - input.lastClickT < 300 && input.lastClickType === hit.type) { selectSameTypeOnScreen(hit.type); }
+                input.lastClickType = hit.type; input.lastClickT = now;
+                updatePanels();
+              }
             }
           }
-          input.rDown = false;
+          input.lDown = false;
           input.rectSelecting = false;
+        } else if (e.button === 2) {
+          e.preventDefault();
+          if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; return; }
+          const sel = players[0].units.filter(u => u.selected && !u.dead);
+          const tgt = entityAt(input.wx, input.wy);
+          if (sel.length === 0 && tgt && tgt.owner === 0) { unselectAll(); tgt.selected = true; updatePanels(); return; }
+          if (sel.length) {
+            if (tgt instanceof Structure && tgt.isGhost && sel.some(u => u.type === 'worker')) {
+              sel.filter(u => u.type === 'worker').forEach(w => { w.state = 'build'; w.buildTargetId = tgt.id; });
+            } else if (tgt instanceof ResourceNode && sel.some(u => u.type === 'worker')) {
+              sel.filter(u => u.type === 'worker').forEach(w => { w.role = tgt.type; w.state = 'idle'; });
+            } else if (tgt && tgt.owner !== 0) { sel.forEach(u => u.setTarget(tgt)); }
+            else { sel.forEach((u, i) => u.setDest(input.wx + i * 12, input.wy)); }
+          }
         }
       });
 
@@ -371,8 +379,19 @@ function drawWeather(dt) {
       /* ==== Minimap ==== */
       mini.addEventListener('click', e => { const r = mini.getBoundingClientRect(); const mx = (e.clientX - r.left) / r.width, my = (e.clientY - r.top) / r.height; world.camX = mx * world.width - (cvs.width / DPR) / world.zoom / 2; world.camY = my * world.height - (cvs.height / DPR) / world.zoom / 2; });
       function drawMinimap() {
-        const img = mctx.createImageData(mini.width, mini.height); for (let y = 0; y < mini.height; y++) { for (let x = 0; x < mini.width; x++) { const idx = (y * mini.width + x) * 4; img.data[idx] = 0; img.data[idx + 1] = 60; img.data[idx + 2] = 10; img.data[idx + 3] = 255; } } mctx.putImageData(img, 0, 0);
-        function dot(x, y, col) { mctx.fillStyle = col; mctx.fillRect(x - 1, y - 1, 2, 2); }
+        const img = mctx.createImageData(mini.width, mini.height);
+        for (let y = 0; y < mini.height; y++) {
+          for (let x = 0; x < mini.width; x++) {
+            const idx = (y * mini.width + x) * 4;
+            const h = (x * 73856093 ^ y * 19349663) & 255;
+            img.data[idx] = 20 + (h & 31);
+            img.data[idx + 1] = 100 + (h & 63);
+            img.data[idx + 2] = 20 + (h & 31);
+            img.data[idx + 3] = 255;
+          }
+        }
+        mctx.putImageData(img, 0, 0);
+        function dot(x, y, col) { mctx.fillStyle = col; mctx.fillRect(x | 0, y | 0, 2, 2); }
         for (const p of players) { for (const s of p.structures) { if (!isExplored(s.x, s.y)) continue; dot(s.x / world.width * mini.width, s.y / world.height * mini.height, p.color); } for (const u of p.units) { if (!isExplored(u.x, u.y)) continue; dot(u.x / world.width * mini.width, u.y / world.height * mini.height, p.color); } }
         for (const n of neutral.units) { if (!isExplored(n.x, n.y)) continue; dot(n.x / world.width * mini.width, n.y / world.height * mini.height, '#9fb2a1'); }
         mctx.strokeStyle = 'rgba(255,255,255,.8)'; mctx.lineWidth = 1; const rx = world.camX / world.width * mini.width, ry = world.camY / world.height * mini.height; const rw = (cvs.width / DPR) / world.zoom / world.width * mini.width, rh = (cvs.height / DPR) / world.zoom / world.height * mini.height; mctx.strokeRect(rx, ry, rw, rh);
@@ -462,8 +481,12 @@ globalThis.drawHp = drawHp;
         }
         ctx.clearRect(0, 0, cvs.width, cvs.height);
         drawTerrain();
-        const drawables = allStructures().concat(allUnits(), neutral.units, projectiles, riceNodes, waterNodes, drops); drawables.sort((a, b) => a.y - b.y);
+        for (const n of riceNodes) n.draw();
+        for (const n of waterNodes) n.draw();
+        if (globalThis.drawBlockers) globalThis.drawBlockers();
+        const drawables = allStructures().concat(allUnits(), neutral.units, drops); drawables.sort((a, b) => a.y - b.y);
         for (const e of drawables) { if (e.draw) e.draw(); }
+        for (const pr of projectiles) pr.draw();
         drawWeather(dt);
         drawFog();
         if (input.rectSelecting) {
