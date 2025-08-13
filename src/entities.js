@@ -1,6 +1,18 @@
 /* ==== Entities ==== */
 let nextId = 1;
 
+function moveEntity(e, dx, dy, v, dt) {
+  const d = Math.hypot(dx, dy);
+  if (d <= 0) return;
+  const nx = e.x + (dx / d) * v * dt, ny = e.y + (dy / d) * v * dt;
+  if (!globalThis.isBlocked(nx, ny)) { e.x = nx; e.y = ny; return; }
+  const ux = -dy / d, uy = dx / d;
+  const sx = e.x + ux * v * dt, sy = e.y + uy * v * dt;
+  if (!globalThis.isBlocked(sx, sy)) { e.x = sx; e.y = sy; return; }
+  const sx2 = e.x - ux * v * dt, sy2 = e.y - uy * v * dt;
+  if (!globalThis.isBlocked(sx2, sy2)) { e.x = sx2; e.y = sy2; }
+}
+
 export class Entity {
   constructor(x, y, owner = -1) {
     this.id = nextId++;
@@ -98,8 +110,7 @@ export class Unit extends Entity {
       const dx = this.destX - this.x, dy = this.destY - this.y, d = Math.hypot(dx, dy);
       if (d > 2) {
         const v = this.getCurrentSpeed();
-        const nx = this.x + dx / d * v * dt, ny = this.y + dy / d * v * dt;
-        if (!globalThis.isBlocked(nx, ny)) { this.x = nx; this.y = ny; }
+        moveEntity(this, dx, dy, v, dt);
       } else {
         this.state = 'harvest';
         this.workTimer = (this.role === 'rice' ? 2.2 : 2.6);
@@ -118,8 +129,7 @@ export class Unit extends Entity {
       const dx = this.destX - this.x, dy = this.destY - this.y, d = Math.hypot(dx, dy);
       if (d > 2) {
         const v = this.getCurrentSpeed();
-        const nx = this.x + dx / d * v * dt, ny = this.y + dy / d * v * dt;
-        if (!globalThis.isBlocked(nx, ny)) { this.x = nx; this.y = ny; }
+        moveEntity(this, dx, dy, v, dt);
       } else {
         if (this.carry > 0) {
           if (this.role === 'rice') P.res.rice += this.carry;
@@ -149,8 +159,7 @@ export class Unit extends Entity {
     const d = Math.hypot(dx, dy);
     if (d > this.attackRange) {
       const v = this.getCurrentSpeed();
-      const nx = this.x + dx / d * v * dt, ny = this.y + dy / d * v * dt;
-      if (!globalThis.isBlocked(nx, ny)) { this.x = nx; this.y = ny; }
+      moveEntity(this, dx, dy, v, dt);
     } else {
       this.attackCd -= dt;
       if (this.attackCd <= 0) {
@@ -165,8 +174,7 @@ export class Unit extends Entity {
     const d = Math.hypot(dx, dy);
     if (d > 2) {
       const v = this.getCurrentSpeed();
-      const nx = this.x + dx / d * v * dt, ny = this.y + dy / d * v * dt;
-      if (!globalThis.isBlocked(nx, ny)) { this.x = nx; this.y = ny; }
+      moveEntity(this, dx, dy, v, dt);
     }
   }
   update(dt) {
@@ -296,7 +304,7 @@ export class ItemDrop extends Entity {
   draw() {
     if (!globalThis.isExplored(this.x, this.y)) return;
     const s = globalThis.worldToScreen(this.x, this.y);
-    const map = { scroll_hp: 'HP', scroll_dps: 'DPS', ring_atk: 'Ring', boots: 'Boots', amulet: 'Amul', orb: 'Orb' };
+    const map = { scroll_hp: 'HP', scroll_dps: 'DPS', ring_atk: 'Mana', boots: 'Boots', amulet: 'Amul', orb: 'Orb' };
     const col = (this.kind === 'scroll_hp') ? '#7cff97' : (this.kind === 'scroll_dps' ? '#ffd27a' : '#8ad');
     globalThis.drawSprite('item', s.x, s.y - 10 * globalThis.world.zoom, globalThis.world.zoom * 1.25, { r: col, R: col });
     globalThis.ctx.fillStyle = '#000';
@@ -336,9 +344,7 @@ export class NeutralCreep extends Entity {
     if (!this.aggro && md < this.leash) this.aggro = true;
     if (this.aggro && tgt && md < this.leash * 1.2) {
       if (md > this.attackRange) {
-        const ux = (tgt.x - this.x) / md, uy = (tgt.y - this.y) / md;
-        const nx = this.x + ux * 80 * dt, ny = this.y + uy * 80 * dt;
-        if (!globalThis.isBlocked(nx, ny)) { this.x = nx; this.y = ny; }
+        moveEntity(this, tgt.x - this.x, tgt.y - this.y, 80, dt);
       } else {
         this.attackCd -= dt;
         if (this.attackCd <= 0) {
@@ -349,8 +355,7 @@ export class NeutralCreep extends Entity {
     } else {
       const dx = this.homeX - this.x, dy = this.homeY - this.y, d = Math.hypot(dx, dy);
       if (d > 2) {
-        const nx = this.x + dx / d * 60 * dt, ny = this.y + dy / d * 60 * dt;
-        if (!globalThis.isBlocked(nx, ny)) { this.x = nx; this.y = ny; }
+        moveEntity(this, dx, dy, 60, dt);
       }
       this.aggro = false;
     }

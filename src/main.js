@@ -59,7 +59,35 @@ let simTime = 0;
 
       /* ==== Hero & abilities ==== */
       const abilityBar = document.getElementById('abilityBar'); const heroName = document.getElementById('heroName'), heroHP = document.getElementById('heroHP'), heroMP = document.getElementById('heroMP'), heroLVL = document.getElementById('heroLVL'); const ab1 = document.getElementById('ab1'), ab2 = document.getElementById('ab2'), ab3 = document.getElementById('ab3'); const invPanel = document.getElementById('invPanel'), invGrid = document.getElementById('invGrid');
-      function setHeroUI(h) { if (!h) { abilityBar.style.display = 'none'; invPanel.style.display = 'none'; return; } abilityBar.style.display = 'block'; invPanel.style.display = 'block'; heroName.textContent = h.heroName + ' (' + h.heroClass + ')'; heroHP.textContent = `HP ${h.hp | 0}/${h.maxHp | 0}`; heroMP.textContent = `MP ${h.mp | 0}/${h.maxMp | 0}`; heroLVL.textContent = 'Lvl ' + h.levelStacks; }
+      const abilityInfo = {
+        paladin: {
+          1: 'Исцеление (40 маны): лечит союзников на 90 HP в радиусе 180.',
+          2: 'Щит (35 маны): даёт 120 щита.',
+          3: 'Святая вспышка (45 маны): лечит союзников на 70 HP и наносит 60 урона врагам в радиусе 200.'
+        },
+        rogue: {
+          1: 'Спринт (25 маны): ускоряет героя на 2.5 с.',
+          2: 'Вихрь (40 маны): наносит 70 урона врагам в радиусе 180.',
+          3: 'Теневой удар (55 маны): наносит 50 урона и замедляет на 3.5 с врагов в радиусе 220.'
+        },
+        archmage: {
+          1: 'Огненный взрыв (35 маны): наносит 80 урона по области 120 в точке указателя.',
+          2: 'Призыв элементаля (60 маны): существо 200 HP, 18 DPS на 20 с.',
+          3: 'Призыв демона (90 маны): существо 500 HP, 36 DPS на 25 с.'
+        }
+      };
+      function setHeroUI(h) {
+        if (!h) { abilityBar.style.display = 'none'; invPanel.style.display = 'none'; return; }
+        abilityBar.style.display = 'block'; invPanel.style.display = 'block';
+        heroName.textContent = h.heroName + ' (' + h.heroClass + ')';
+        heroHP.textContent = `HP ${h.hp | 0}/${h.maxHp | 0}`;
+        heroMP.textContent = `MP ${h.mp | 0}/${h.maxMp | 0}`;
+        heroLVL.textContent = 'Lvl ' + h.levelStacks;
+        const info = abilityInfo[h.heroClass] || {};
+        ab1.title = info[1] || '';
+        ab2.title = info[2] || '';
+        ab3.title = info[3] || '';
+      }
       ab1.onclick = () => tryCast(1); ab2.onclick = () => tryCast(2); ab3.onclick = () => tryCast(3);
       function spawnHero(owner, x, y, cls = null) {
         const h = new Unit(x, y, owner, 'soldier'); h.isHero = true; h.maxHp = 420; h.hp = 420; h.maxMp = 160; h.mp = 120; h.dps = 50; h.attackRange = 40; h.vision = 560; h.inventory = []; h.levelStacks = 0; h.regen = 1.2; h.mpRegen = 0.8;
@@ -86,7 +114,7 @@ let simTime = 0;
         for (let i = 0; i < cap; i++) {
           const slot = document.createElement('div'); slot.className = 'invSlot';
           if (arr[i]) {
-            const it = arr[i]; const names = { scroll_hp: 'Свиток HP', scroll_dps: 'Свиток DPS', ring_atk: 'Кольцо атаки', boots: 'Сапоги', amulet: 'Амулет', orb: 'Орб маны' };
+            const it = arr[i]; const names = { scroll_hp: 'Свиток HP', scroll_dps: 'Свиток DPS', ring_atk: 'Кольцо маны', boots: 'Сапоги', amulet: 'Амулет', orb: 'Орб маны' };
             slot.textContent = names[it] || it;
             slot.title = 'ЛКМ/ПКМ — использовать';
             slot.onclick = (e) => { applyItem(hero, it); hero.inventory.splice(i, 1); renderInventory(hero); };
@@ -95,7 +123,23 @@ let simTime = 0;
           invGrid.appendChild(slot);
         }
       }
-      function applyItem(hero, itemKind) { if (itemKind === 'scroll_hp') { hero.maxHp += 80; hero.hp = Math.min(hero.maxHp, hero.hp + 120); } if (itemKind === 'scroll_dps') { hero.dps = (hero.dps || 40) + 10; } if (itemKind === 'ring_atk') { hero.dps += 6; } if (itemKind === 'boots') { hero.baseSpeed += 20; hero.speed += 20; } if (itemKind === 'amulet') { hero.maxHp += 120; hero.hp += 120; } if (itemKind === 'orb') { hero.maxMp += 60; hero.mp += 60; } if (hero.owner === 0) setHeroUI(hero); }
+      function applyItem(hero, itemKind) {
+        if (itemKind === 'scroll_hp') {
+          hero.maxHp += 80; hero.hp = Math.min(hero.maxHp, hero.hp + 120);
+        } else if (itemKind === 'scroll_dps') {
+          hero.dps += 10;
+          setTimeout(() => { hero.dps -= 10; }, 20000);
+        } else if (itemKind === 'ring_atk') {
+          hero.maxMp += 40; hero.mp += 40;
+        } else if (itemKind === 'boots') {
+          hero.baseSpeed += 20; hero.speed += 20;
+        } else if (itemKind === 'amulet') {
+          hero.maxHp += 120; hero.hp += 120;
+        } else if (itemKind === 'orb') {
+          hero.maxMp += 60; hero.mp += 60;
+        }
+        if (hero.owner === 0) setHeroUI(hero);
+      }
       function tryCast(slot) {
         const h = players[0].hero; if (!h || h.dead) return;
         if (slot === 1 && h.cd1 <= 0) {
