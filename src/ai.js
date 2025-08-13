@@ -31,6 +31,8 @@ function aiThink(dt, id) {
   const POP_CAP = globalThis.POP_CAP;
   const placeGhost = globalThis.placeGhost;
   const isBlocked = globalThis.isBlocked;
+  const neutral = globalThis.neutral;
+  const dist2 = globalThis.dist2;
   if (!players[id].ai) return;
   if (!players[id].aiPlan) aiInitPlan(players[id]);
   const P = players[id];
@@ -59,10 +61,9 @@ function aiThink(dt, id) {
     else if (mb) mb.queue.push('mage');
   }
   // hero farms nearest neutral
-  const neutral = globalThis.neutral;
   const hero = P.hero;
   if (hero && !hero.dead) {
-    const tgt = nearestNeutralCamp(P);
+    const tgt = nearestNeutralCamp(P, neutral, dist2);
     if (tgt) {
       hero.setTarget(tgt);
     }
@@ -74,9 +75,7 @@ function aiThink(dt, id) {
     if (tgt) { P.units.filter(u => u.type !== 'worker').forEach(u => { if (!u.retreat) u.setTarget(tgt); }); }
   }
 }
-function nearestNeutralCamp(P) {
-  const neutral = globalThis.neutral;
-  const { dist2 } = globalThis;
+function nearestNeutralCamp(P, neutral, dist2) {
   if (!P.structures.length) {
     console.warn('nearestNeutralCamp: no structures available');
     return null;
@@ -98,4 +97,4 @@ function nearestNeutralCamp(P) {
   }
   return best;
 }
-Object.assign(globalThis, { aiInitPlan, aiThink, nearestNeutralCamp });
+module.exports = { aiInitPlan, aiThink, nearestNeutralCamp };

@@ -1,11 +1,11 @@
-require('../src/ai.js');
+const { nearestNeutralCamp } = require('../src/ai.js');
 
-globalThis.neutral = { units: [] };
-globalThis.dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
+const neutral = { units: [] };
+const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
 
 // no structures
 const P = { structures: [] };
-let result = globalThis.nearestNeutralCamp(P);
+let result = nearestNeutralCamp(P, neutral, dist2);
 if (result === null) {
   console.log('nearestNeutralCamp returned null when no structures: OK');
 } else {
@@ -14,9 +14,9 @@ if (result === null) {
 }
 
 // no neutral units
-globalThis.neutral.units = [];
+neutral.units = [];
 const P2 = { structures: [{ x: 0, y: 0 }] };
-result = globalThis.nearestNeutralCamp(P2);
+result = nearestNeutralCamp(P2, neutral, dist2);
 if (result === null) {
   console.log('nearestNeutralCamp returned null when no neutral units: OK');
 } else {
@@ -25,13 +25,13 @@ if (result === null) {
 }
 
 // chooses nearest
-globalThis.neutral.units = [
+neutral.units = [
   { x: 10, y: 0, dead: false },
   { x: 3, y: 4, dead: false },
 ];
 const P3 = { structures: [{ x: 0, y: 0 }] };
-result = globalThis.nearestNeutralCamp(P3);
-if (result === globalThis.neutral.units[1]) {
+result = nearestNeutralCamp(P3, neutral, dist2);
+if (result === neutral.units[1]) {
   console.log('nearestNeutralCamp returned nearest camp: OK');
 } else {
   console.error('nearestNeutralCamp did not return nearest camp');
