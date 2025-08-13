@@ -88,6 +88,13 @@ const dist2=(x1,y1,x2,y2)=>{const dx=x2-x1,dy=y2-y1;return dx*dx+dy*dy;};
 /* ==== Canvas & camera ==== */
 const cvs=document.getElementById('game'), ctx=cvs.getContext('2d'); ctx.imageSmoothingEnabled=false;
 const mini=document.getElementById('minimap'), mctx=mini.getContext('2d'); mctx.imageSmoothingEnabled=false;
+const miniBase=document.createElement('canvas'), miniBaseCtx=miniBase.getContext('2d');
+miniBase.width=mini.width; miniBase.height=mini.height;
+const miniBaseImg=miniBaseCtx.createImageData(mini.width,mini.height);
+for(let i=0;i<miniBaseImg.data.length;i+=4){
+  miniBaseImg.data[i]=0; miniBaseImg.data[i+1]=60; miniBaseImg.data[i+2]=10; miniBaseImg.data[i+3]=255;
+}
+miniBaseCtx.putImageData(miniBaseImg,0,0);
 const DPR=Math.max(1,window.devicePixelRatio||1);
 const world={width:12000,height:8000,camX:0,camY:0,zoom:1};
 function resize(){const w=cvs.clientWidth,h=cvs.clientHeight;cvs.width=Math.floor(w*DPR);cvs.height=Math.floor(h*DPR);ctx.setTransform(DPR,0,0,DPR,0,0);}
@@ -122,14 +129,34 @@ function isBlocked(wx,wy){ for(const b of blockers){ if(dist2(wx,wy,b.x,b.y)<= (
 
 /* ==== Fog of war ==== */
 const F_W=180,F_H=120; const explored=new Uint8Array(F_W*F_H), visible=new Uint8Array(F_W*F_H);
+const fogCanvas=document.createElement('canvas'), fogCtx=fogCanvas.getContext('2d');
+fogCanvas.width=F_W; fogCanvas.height=F_H;
+const fogImg=fogCtx.createImageData(F_W,F_H);
+let fogDirty=true;
 function fogIndex(wx,wy){ const x=clamp(Math.floor(wx/world.width*F_W),0,F_W-1), y=clamp(Math.floor(wy/world.height*F_H),0,F_H-1); return y*F_W+x; }
-function clearVisible(){ visible.fill(0); }
+function clearVisible(){ visible.fill(0); fogDirty=true; }
 function revealCircle(wx,wy,r){ const cx=Math.floor(wx/world.width*F_W), cy=Math.floor(wy/world.height*F_H), rr=(r/world.width*F_W), R2=rr*rr; const x0=clamp(Math.floor(cx-rr-1),0,F_W-1), x1=clamp(Math.ceil(cx+rr+1),0,F_W-1); const y0=clamp(Math.floor(cy-rr-1),0,F_H-1), y1=clamp(Math.ceil(cy+rr+1),0,F_H-1);
-  for(let y=y0;y<=y1;y++){ for(let x=x0;x<=x1;x++){ const dx=x-cx, dy=y-cy; if(dx*dx+dy*dy<=R2){ visible[y*F_W+x]=1; explored[y*F_W+x]=1; } } } }
+  for(let y=y0;y<=y1;y++){ for(let x=x0;x<=x1;x++){ const dx=x-cx, dy=y-cy; if(dx*dx+dy*dy<=R2){ visible[y*F_W+x]=1; explored[y*F_W+x]=1; } } }
+  fogDirty=true; }
 function isVisible(wx,wy){ return !fogEnabled || visible[fogIndex(wx,wy)]===1; }
 function isExplored(wx,wy){ return !fogEnabled || explored[fogIndex(wx,wy)]===1; }
-function drawFog(){ if(!fogEnabled) return; const w=cvs.width,h=cvs.height; const img=ctx.createImageData(w,h);
-  for(let py=0;py<h;py+=2){ for(let px=0;px<w;px+=2){ const wx=(px/DPR)/world.zoom+world.camX, wy=(py/DPR)/world.zoom+world.camY, idx=fogIndex(wx,wy); let a=0; if(!explored[idx]) a=235; else if(!visible[idx]) a=140; for(let dy=0;dy<2;dy++){ for(let dx=0;dx<2;dx++){ const j=((py+dy)*w+(px+dx))*4; img.data[j]=0; img.data[j+1]=0; img.data[j+2]=0; img.data[j+3]=a; } } } } ctx.putImageData(img,0,0); }
+function refreshFog(){
+  for(let i=0;i<explored.length;i++){
+    let a=0;
+    if(!explored[i]) a=235; else if(!visible[i]) a=140;
+    const j=i*4;
+    fogImg.data[j]=0; fogImg.data[j+1]=0; fogImg.data[j+2]=0; fogImg.data[j+3]=a;
+  }
+  fogCtx.putImageData(fogImg,0,0);
+  fogDirty=false;
+}
+function drawFog(){
+  if(!fogEnabled) return;
+  if(fogDirty) refreshFog();
+  const sx=world.camX/world.width*F_W, sy=world.camY/world.height*F_H;
+  const sw=(cvs.width/DPR)/world.zoom/world.width*F_W, sh=(cvs.height/DPR)/world.zoom/world.height*F_H;
+  ctx.drawImage(fogCanvas, sx, sy, sw, sh, 0, 0, cvs.width, cvs.height);
+}
 
 /* ==== Audio (простые огибающие без внешних файлов) ==== */
 const AC=window.AudioContext?new AudioContext():null;
@@ -358,7 +385,8 @@ function updateStatsPanel(){ const targets=[...players[0].units,...players[0].st
 
 /* ==== Minimap ==== */
 mini.addEventListener('click', e=>{ const r=mini.getBoundingClientRect(); const mx=(e.clientX-r.left)/r.width, my=(e.clientY-r.top)/r.height; world.camX=mx*world.width-(cvs.width/DPR)/world.zoom/2; world.camY=my*world.height-(cvs.height/DPR)/world.zoom/2; });
-function drawMinimap(){ const img=mctx.createImageData(mini.width,mini.height); for(let y=0;y<mini.height;y++){ for(let x=0;x<mini.width;x++){ const idx=(y*mini.width+x)*4; img.data[idx]=0; img.data[idx+1]=60; img.data[idx+2]=10; img.data[idx+3]=255; } } mctx.putImageData(img,0,0);
+function drawMinimap(){
+  mctx.drawImage(miniBase,0,0);
   function dot(x,y,col){ mctx.fillStyle=col; mctx.fillRect(x-1,y-1,2,2); }
   for(const p of players){ for(const s of p.structures){ if(!isExplored(s.x,s.y)) continue; dot(s.x/world.width*mini.width, s.y/world.height*mini.height, p.color); } for(const u of p.units){ if(!isExplored(u.x,u.y)) continue; dot(u.x/world.width*mini.width, u.y/world.height*mini.height, p.color); } }
   for(const n of neutral.units){ if(!isExplored(n.x,n.y)) continue; dot(n.x/world.width*mini.width, n.y/world.height*mini.height, '#9fb2a1'); }
