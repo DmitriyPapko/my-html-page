@@ -146,6 +146,13 @@
       text-align: center;
       cursor: pointer
     }
+    .invSlot.flash {
+      animation: invFlash 0.15s;
+    }
+    @keyframes invFlash {
+      from { background: rgba(255,255,255,0.6); }
+      to { background: rgba(255,255,255,0.06); }
+    }
 
     #minimap {
       position: fixed;
