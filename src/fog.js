@@ -33,7 +33,7 @@ function drawFog() {
             wy = (py / DPR) / world.zoom + world.camY,
             idx = fogIndex(wx, wy);
       let a = 0;
-      if (!explored[idx]) a = 235; else if (!visible[idx]) a = 140;
+      if (!explored[idx]) a = 220; else if (!visible[idx]) a = 120;
       for (let dy = 0; dy < 2; dy++) {
         for (let dx = 0; dx < 2; dx++) {
           const j = ((py + dy) * w + (px + dx)) * 4;

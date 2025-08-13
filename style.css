@@ -83,6 +83,14 @@
       min-width: 620px
     }
 
+    #abilityDesc {
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 12px;
+      min-width: 320px;
+      white-space: pre-line
+    }
+
     #invPanel {
       left: 12px;
       top: 120px;
@@ -151,6 +159,30 @@
       border: 1px solid rgba(255, 255, 255, .12);
       display: none;
       z-index: 85
+    }
+
+    #heroSelect {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, .65);
+      z-index: 95
+    }
+
+    .heroChoice {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      margin-top: 12px
+    }
+
+    .heroBtn {
+      width: 120px;
+      height: 120px;
+      font-weight: 700;
+      font-size: 16px
     }
 
     #menu {
