@@ -32,15 +32,32 @@ globalThis.beep = beep;
         constructor(x, y, owner, type = 'worker') { super(x, y, owner); this.type = type; this.radius = 12; this.speed = 190; this.baseSpeed = 190; this.destX = x; this.destY = y; this.attackRange = 28; this.attackCd = 0; this.dps = 22; this.vision = 480; this.isHero = false; this.mp = 0; this.maxMp = 0; this.cd1 = 0; this.cd2 = 0; this.cd3 = 0; this.cdM1 = 8; this.cdM2 = 12; this.cdM3 = 20; this.heroClass = null; this.levelStacks = 0; this.inventory = []; this.targetId = null; this.role = null; this.state = 'idle'; this.workTimer = 0; this.carry = 0; this.speedBuff = 0; this.slow = 0; this.summonTimer = 0; this.retreat = false; this.regen = 0.25; }
         setDest(x, y) { this.destX = x; this.destY = y; this.state = 'move'; this.targetId = null; }
         setTarget(e) { this.targetId = e ? e.id : null; this.state = e ? 'fight' : 'move'; }
-        thinkWorker(dt) {
+        getCurrentSpeed() { return this.speed * (this.speedBuff ? 1.5 : 1.0) * (this.slow ? 0.6 : 1.0); }
+        updateWorker(dt) {
           if (this.role !== 'rice' && this.role !== 'water') return;
           const P = players[this.owner]; const HQ = P.structures.find(s => s.kind === 'hq');
           const node = (this.role === 'rice' ? nearestNode('rice', P) : nearestNode('water', P));
           if (!HQ || !node) return;
           if (this.state === 'idle') { this.state = 'to_node'; this.destX = node.x + rand(-24, 24); this.destY = node.y + rand(-24, 24); }
-          if (this.state === 'to_node') { const dx = this.destX - this.x, dy = this.destY - this.y, d = Math.hypot(dx, dy); if (d > 2) { const v = this.speed * (this.speedBuff ? 1.5 : 1.0) * (this.slow ? 0.6 : 1.0); const nx = this.x + dx / d * v * dt, ny = this.y + dy / d * v * dt; if (!isBlocked(nx, ny)) { this.x = nx; this.y = ny; } } else { this.state = 'harvest'; this.workTimer = (this.role === 'rice' ? 2.2 : 2.6); } }
+          if (this.state === 'to_node') { const dx = this.destX - this.x, dy = this.destY - this.y, d = Math.hypot(dx, dy); if (d > 2) { const v = this.getCurrentSpeed(); const nx = this.x + dx / d * v * dt, ny = this.y + dy / d * v * dt; if (!isBlocked(nx, ny)) { this.x = nx; this.y = ny; } } else { this.state = 'harvest'; this.workTimer = (this.role === 'rice' ? 2.2 : 2.6); } }
           if (this.state === 'harvest') { this.workTimer -= dt; if (this.workTimer <= 0) { this.carry = (this.role === 'rice' ? 12 : 9); this.state = 'to_hq'; this.destX = HQ.x + rand(-32, 32); this.destY = HQ.y + rand(-32, 32); } }
-          if (this.state === 'to_hq') { const dx = this.destX - this.x, dy = this.destY - this.y, d = Math.hypot(dx, dy); if (d > 2) { const v = this.speed * (this.speedBuff ? 1.5 : 1.0) * (this.slow ? 0.6 : 1.0); const nx = this.x + dx / d * v * dt, ny = this.y + dy / d * v * dt; if (!isBlocked(nx, ny)) { this.x = nx; this.y = ny; } } else { if (this.carry > 0) { if (this.role === 'rice') P.res.rice += this.carry; else P.res.water += this.carry; if (this.owner === 0) updateRes(); this.carry = 0; } this.state = 'to_node'; this.destX = node.x + rand(-24, 24); this.destY = node.y + rand(-24, 24); } }
+          if (this.state === 'to_hq') { const dx = this.destX - this.x, dy = this.destY - this.y, d = Math.hypot(dx, dy); if (d > 2) { const v = this.getCurrentSpeed(); const nx = this.x + dx / d * v * dt, ny = this.y + dy / d * v * dt; if (!isBlocked(nx, ny)) { this.x = nx; this.y = ny; } } else { if (this.carry > 0) { if (this.role === 'rice') P.res.rice += this.carry; else P.res.water += this.carry; if (this.owner === 0) updateRes(); this.carry = 0; } this.state = 'to_node'; this.destX = node.x + rand(-24, 24); this.destY = node.y + rand(-24, 24); } }
+        }
+        updateRetreat(dt) {
+          if (this.owner !== 0 && !this.isHero) {
+            const HQ = players[this.owner].structures.find(s => s.kind === 'hq');
+            if (this.hp / this.maxHp < 0.35) { this.retreat = true; if (HQ) this.setDest(HQ.x, HQ.y + 40); }
+            else if (this.hp / this.maxHp > 0.8) { this.retreat = false; }
+          }
+        }
+        updateCombat(dt, target) {
+          const dx = target.x - this.x, dy = target.y - this.y; const d = Math.hypot(dx, dy);
+          if (d > this.attackRange) { const v = this.getCurrentSpeed(); const nx = this.x + dx / d * v * dt, ny = this.y + dy / d * v * dt; if (!isBlocked(nx, ny)) { this.x = nx; this.y = ny; } }
+          else { this.attackCd -= dt; if (this.attackCd <= 0) { this.attackCd = .55; target.damage(this.dps, this.owner); if (!muted) beep(220 + this.dps, 0.05, 'square', 0.03); } }
+        }
+        updateMovement(dt) {
+          const dx = this.destX - this.x, dy = this.destY - this.y; const d = Math.hypot(dx, dy);
+          if (d > 2) { const v = this.getCurrentSpeed(); const nx = this.x + dx / d * v * dt, ny = this.y + dy / d * v * dt; if (!isBlocked(nx, ny)) { this.x = nx; this.y = ny; } }
         }
         update(dt) {
           if (this.dead) return;
@@ -49,22 +66,11 @@ globalThis.beep = beep;
           if (this.speedBuff > 0) { this.speedBuff = Math.max(0, this.speedBuff - dt); }
           if (this.slow > 0) { this.slow = Math.max(0, this.slow - dt); }
           if (this.summonTimer > 0) { this.summonTimer -= dt; if (this.summonTimer <= 0) { this.dead = true; } }
-          if (this.type === 'worker' && !this.isHero) { this.thinkWorker(dt); return; }
-          // retreat logic for AI units
-          if (this.owner !== 0 && !this.isHero) {
-            const HQ = players[this.owner].structures.find(s => s.kind === 'hq');
-            if (this.hp / this.maxHp < 0.35) { this.retreat = true; if (HQ) this.setDest(HQ.x, HQ.y + 40); }
-            else if (this.hp / this.maxHp > 0.8) { this.retreat = false; }
-          }
+          if (this.type === 'worker' && !this.isHero) { this.updateWorker(dt); return; }
+          this.updateRetreat(dt);
           const target = getById(this.targetId);
-          if (target && !target.dead && !this.retreat) {
-            const dx = target.x - this.x, dy = target.y - this.y; const d = Math.hypot(dx, dy);
-            if (d > this.attackRange) { const v = this.speed * (this.speedBuff ? 1.5 : 1.0) * (this.slow ? 0.6 : 1.0); const nx = this.x + dx / d * v * dt, ny = this.y + dy / d * v * dt; if (!isBlocked(nx, ny)) { this.x = nx; this.y = ny; } }
-            else { this.attackCd -= dt; if (this.attackCd <= 0) { this.attackCd = .55; target.damage(this.dps, this.owner); if (!muted) beep(220 + this.dps, 0.05, 'square', 0.03); } }
-          } else {
-            const dx = this.destX - this.x, dy = this.destY - this.y; const d = Math.hypot(dx, dy);
-            if (d > 2) { const v = this.speed * (this.speedBuff ? 1.5 : 1.0) * (this.slow ? 0.6 : 1.0); const nx = this.x + dx / d * v * dt, ny = this.y + dy / d * v * dt; if (!isBlocked(nx, ny)) { this.x = nx; this.y = ny; } }
-          }
+          if (target && !target.dead && !this.retreat) { this.updateCombat(dt, target); }
+          else { this.updateMovement(dt); }
           // auto-acquire target (агр рядом)
           if (!this.isHero) { const enemies = enemiesFor(this.owner); let best = null, bd = 1e9; for (const e of enemies) { if (e.dead) continue; const d = dist2(this.x, this.y, e.x, e.y); if (d < bd && d <= this.vision * this.vision) { bd = d; best = e; } } if (best) { this.setTarget(best); } }
         }
