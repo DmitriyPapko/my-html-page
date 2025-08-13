@@ -8,9 +8,6 @@ const btnFog = document.getElementById('btnFog');
 const resultMenu = document.getElementById('resultMenu');
 const resultText = document.getElementById('resultText');
 const btnResultRestart = document.getElementById('btnResultRestart');
-const idleWorkersEl = document.getElementById('idleWorkers');
-
-globalThis.idleWorkersEl = idleWorkersEl;
 
 globalThis.paused = true;
 globalThis.muted = false;

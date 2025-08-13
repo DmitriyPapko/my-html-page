@@ -50,8 +50,8 @@ export class Unit extends Entity {
     super(x, y, owner);
     this.type = type;
     this.radius = 12;
-    this.speed = 160;
-    this.baseSpeed = 160;
+    this.speed = 190;
+    this.baseSpeed = 190;
     this.destX = x;
     this.destY = y;
     this.attackRange = 28;
@@ -83,8 +83,6 @@ export class Unit extends Entity {
     this.regen = 0.25;
     this.auraTimer = 0;
     this.buildTargetId = null;
-    this.nodeId = null;
-    this.alertTimer = 0;
   }
   setDest(x, y) {
     this.destX = x;
@@ -103,20 +101,13 @@ export class Unit extends Entity {
     if (this.role !== 'rice' && this.role !== 'water') return;
     const P = globalThis.players[this.owner];
     const HQ = P.structures.find(s => s.kind === 'hq');
-    if (!HQ) { this.state = 'idle'; this.nodeId = null; this.alertTimer = 2.5; return; }
+    if (!HQ) { this.state = 'idle'; return; }
     const node = (this.role === 'rice' ? nearestNode('rice', P) : nearestNode('water', P));
-    if (!node) { this.state = 'idle'; this.nodeId = null; this.alertTimer = 2.5; return; }
-    if (this.nodeId !== node.id && this.state !== 'to_hq') {
-      this.state = 'to_node';
-      this.destX = node.x + globalThis.rand(-24, 24);
-      this.destY = node.y + globalThis.rand(-24, 24);
-      this.nodeId = node.id;
-    }
+    if (!node) { this.state = 'idle'; return; }
     if (this.state === 'idle') {
       this.state = 'to_node';
       this.destX = node.x + globalThis.rand(-24, 24);
       this.destY = node.y + globalThis.rand(-24, 24);
-      this.nodeId = node.id;
     }
     if (this.state === 'to_node') {
       const dx = this.destX - this.x, dy = this.destY - this.y, d = Math.hypot(dx, dy);
@@ -152,7 +143,6 @@ export class Unit extends Entity {
         this.state = 'to_node';
         this.destX = node.x + globalThis.rand(-24, 24);
         this.destY = node.y + globalThis.rand(-24, 24);
-        this.nodeId = node.id;
       }
     }
   }
@@ -208,7 +198,6 @@ export class Unit extends Entity {
     this.cd3 = Math.max(0, this.cd3 - dt);
     if (this.speedBuff > 0) { this.speedBuff = Math.max(0, this.speedBuff - dt); }
     if (this.slow > 0) { this.slow = Math.max(0, this.slow - dt); }
-    if (this.alertTimer > 0) { this.alertTimer = Math.max(0, this.alertTimer - dt); }
     if (this.summonTimer > 0) { this.summonTimer -= dt; if (this.summonTimer <= 0) { this.dead = true; } }
     if (this.state === 'build') {
       const target = getById(this.buildTargetId);
@@ -246,11 +235,6 @@ export class Unit extends Entity {
     const spr = this.isHero ? 'hero' : (this.type === 'archer' ? 'archer' : (this.type === 'mage' ? 'mage' : 'soldier'));
     globalThis.drawSprite(spr, s.x, s.y, globalThis.world.zoom * 1.25, { o: col });
     globalThis.drawHp(s.x, s.y - 18 * globalThis.world.zoom, this.hp / this.maxHp);
-    if (this.alertTimer > 0) {
-      globalThis.ctx.fillStyle = '#ffd27a';
-      globalThis.ctx.font = `${18 * globalThis.world.zoom}px system-ui`;
-      globalThis.ctx.fillText('!', s.x - 5 * globalThis.world.zoom, s.y - 24 * globalThis.world.zoom);
-    }
     if (this.auraTimer > 0) {
       globalThis.ctx.strokeStyle = 'rgba(255,215,0,0.5)';
       globalThis.ctx.beginPath();

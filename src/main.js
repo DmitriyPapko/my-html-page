@@ -80,14 +80,9 @@ function drawWeather(dt) {
         { name: 'AI‑2', color: '#ffd27a', res: { rice: 220, water: 100 }, units: [], structures: [], hero: null, ai: true, aiPlan: null }
       ];
       const riceNodes = [], waterNodes = [];
-      const resUI = { rice: document.getElementById('resRice'), water: document.getElementById('resWater'), pop: document.getElementById('pop'), idle: document.getElementById('idleWorkers') };
+      const resUI = { rice: document.getElementById('resRice'), water: document.getElementById('resWater'), pop: document.getElementById('pop') };
       const POP_CAP = 20;
-      function updateRes() {
-        resUI.rice.textContent = players[0].res.rice | 0;
-        resUI.water.textContent = players[0].res.water | 0;
-        resUI.pop.textContent = players[0].units.filter(u => !u.dead && !u.isHero).length;
-        resUI.idle.textContent = players[0].units.filter(u => u.type === 'worker' && u.state === 'idle').length;
-      }
+      function updateRes() { resUI.rice.textContent = players[0].res.rice | 0; resUI.water.textContent = players[0].res.water | 0; resUI.pop.textContent = players[0].units.filter(u => !u.dead && !u.isHero).length; }
 
       /* ==== Training & buildings ==== */
       const COSTS = { barracks: { rice: 180, water: 70 }, mBarracks: { rice: 220, water: 110 }, well: { rice: 140, water: 0 }, range: { rice: 160, water: 80 }, altar: { rice: 200, water: 140 } };
@@ -126,7 +121,7 @@ function drawWeather(dt) {
         }
       };
       function setHeroUI(h) {
-        if (!h || !h.selected) { heroPanel.style.display = 'none'; invPanel.style.display = 'none'; return; }
+        if (!h) { heroPanel.style.display = 'none'; invPanel.style.display = 'none'; return; }
         heroPanel.style.display = 'block'; invPanel.style.display = 'block';
         heroName.textContent = h.heroName + ' (' + h.heroClass + ')';
         heroHP.textContent = `HP ${h.hp | 0}/${h.maxHp | 0}`;
@@ -239,12 +234,8 @@ function drawWeather(dt) {
 
       /* ==== Input & selection ==== */
       const buildTip = document.getElementById('buildTip');
-      const input = { x: 0, y: 0, wx: 0, wy: 0, keys: {}, buildMode: null, lastClickT: 0, lastClickType: null, rdown: false, rStartX: 0, rStartY: 0, rStartWX: 0, rStartWY: 0, selX: 0, selY: 0, selWX: 0, selWY: 0 };
-      cvs.addEventListener('mousemove', e => {
-        input.x = e.offsetX; input.y = e.offsetY;
-        const w = screenToWorld(input.x, input.y); input.wx = w.x; input.wy = w.y;
-        if (input.rdown) { input.selX = e.offsetX; input.selY = e.offsetY; input.selWX = w.x; input.selWY = w.y; }
-      });
+      const input = { x: 0, y: 0, wx: 0, wy: 0, keys: {}, buildMode: null, lastClickT: 0, lastClickType: null };
+      cvs.addEventListener('mousemove', e => { input.x = e.offsetX; input.y = e.offsetY; const w = screenToWorld(input.x, input.y); input.wx = w.x; input.wy = w.y; });
       cvs.addEventListener('contextmenu', e => { e.preventDefault(); if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; } });
       window.addEventListener('keydown', e => { const k = e.key.toLowerCase(); input.keys[k] = true; if (k === 'f') globalThis.fogEnabled = !globalThis.fogEnabled; if (k === '1') tryCast(1); if (k === '2') tryCast(2); if (k === '3') tryCast(3); if (k === 'u') { const h = players[0].hero; if (h && h.inventory.length) { const it = h.inventory.shift(); applyItem(h, it); renderInventory(h); } } if (k === 'r') { resumeWorkers(players[0]); } });
       window.addEventListener('keyup', e => { input.keys[e.key.toLowerCase()] = false; });
@@ -273,49 +264,19 @@ function drawWeather(dt) {
           }
           updatePanels();
         } else if (e.button === 2) {
-          input.rdown = true;
-          input.rStartX = e.offsetX; input.rStartY = e.offsetY;
-          input.rStartWX = input.wx; input.rStartWY = input.wy;
-          input.selX = e.offsetX; input.selY = e.offsetY;
-          input.selWX = input.wx; input.selWY = input.wy;
-        }
-      });
-
-      cvs.addEventListener('mouseup', e => {
-        if (e.button === 2) {
-          const dx = e.offsetX - input.rStartX;
-          const dy = e.offsetY - input.rStartY;
-          const dist = Math.hypot(dx, dy);
-          input.rdown = false;
-          if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; if (dist <= 4) return; }
-          if (dist > 4) {
-            const x1 = Math.min(input.rStartWX, input.selWX), y1 = Math.min(input.rStartWY, input.selWY);
-            const x2 = Math.max(input.rStartWX, input.selWX), y2 = Math.max(input.rStartWY, input.selWY);
-            if (!e.shiftKey) unselectAll();
-            for (const u of players[0].units) {
-              if (u.dead) continue;
-              if (u.x >= x1 && u.x <= x2 && u.y >= y1 && u.y <= y2) u.selected = true;
-            }
-            for (const s of players[0].structures) {
-              if (s.dead || s.isGhost) continue;
-              if (s.x >= x1 && s.x <= x2 && s.y >= y1 && s.y <= y2) s.selected = true;
-            }
-            updatePanels();
-          } else {
-            if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; return; }
-            const sel = players[0].units.filter(u => u.selected && !u.dead);
-            const tgt = entityAt(input.wx, input.wy);
-            if (sel.length === 0 && tgt && tgt.owner === 0) {
-              unselectAll(); tgt.selected = true; updatePanels(); return;
-            }
-            if (sel.length) {
-              if (tgt instanceof Structure && tgt.isGhost && sel.some(u => u.type === 'worker')) {
-                sel.filter(u => u.type === 'worker').forEach(w => { w.state = 'build'; w.buildTargetId = tgt.id; });
-              } else if (tgt instanceof ResourceNode && sel.some(u => u.type === 'worker')) {
-                sel.filter(u => u.type === 'worker').forEach(w => { w.role = tgt.type; w.state = 'idle'; });
-              } else if (tgt && tgt.owner !== 0) { sel.forEach(u => u.setTarget(tgt)); }
-              else { sel.forEach((u, i) => u.setDest(input.wx + i * 12, input.wy)); }
-            }
+          if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; return; }
+          const sel = players[0].units.filter(u => u.selected && !u.dead);
+          const tgt = entityAt(input.wx, input.wy);
+          if (sel.length === 0 && tgt && tgt.owner === 0) {
+            unselectAll(); tgt.selected = true; updatePanels(); return;
+          }
+          if (sel.length) {
+            if (tgt instanceof Structure && tgt.isGhost && sel.some(u => u.type === 'worker')) {
+              sel.filter(u => u.type === 'worker').forEach(w => { w.state = 'build'; w.buildTargetId = tgt.id; });
+            } else if (tgt instanceof ResourceNode && sel.some(u => u.type === 'worker')) {
+              sel.filter(u => u.type === 'worker').forEach(w => { w.role = tgt.type; w.state = 'idle'; });
+            } else if (tgt && tgt.owner !== 0) { sel.forEach(u => u.setTarget(tgt)); }
+            else { sel.forEach((u, i) => u.setDest(input.wx + i * 12, input.wy)); }
           }
         }
       });
@@ -470,14 +431,6 @@ globalThis.drawHp = drawHp;
         for (const e of drawables) { if (e.draw) e.draw(); }
         drawWeather(dt);
         drawFog();
-        if (input.rdown) {
-          const x = Math.min(input.rStartX, input.selX);
-          const y = Math.min(input.rStartY, input.selY);
-          const w = Math.abs(input.selX - input.rStartX);
-          const h = Math.abs(input.selY - input.rStartY);
-          ctx.strokeStyle = '#7ac8ff';
-          ctx.strokeRect(x, y, w, h);
-        }
         // cursor
         ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); const c = 8; ctx.moveTo(input.x - c, input.y); ctx.lineTo(input.x + c, input.y); ctx.moveTo(input.x, input.y - c); ctx.lineTo(input.x, input.y + c); ctx.stroke();
         drawMinimap();
