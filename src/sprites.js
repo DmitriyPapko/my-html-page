@@ -1,5 +1,5 @@
-/* Simple pixel sprites and drawing helper */
-const PALETTE = {
+// Pixel sprite system
+export const PALETTE = {
   g: '#3b7a3b',
   G: '#2e642e',
   w: '#83b9d4',
@@ -9,10 +9,11 @@ const PALETTE = {
   t: '#5d3a1a',
   T: '#2e7d32',
   s: '#f1c27d',
-  b: '#8b5a2b'
+  b: '#8b5a2b',
+  o: '#9fb2a1'
 };
 
-const SPRITES = {
+export const SPRITES = {
   grass: [
     "gGgggGggggGggggg",
     "gggggGgggggggggg",
@@ -49,24 +50,6 @@ const SPRITES = {
     "wwWWwwWWwwWWwwWW",
     "WWwwWWwwWWwwWWww"
   ],
-  rice: [
-    "rrrrrrrrrrrrrrrr",
-    "rRrRrRrRrRrRrRrR",
-    "rrrrrrrrrrrrrrrr",
-    "rRrRrRrRrRrRrRrR",
-    "rrrrrrrrrrrrrrrr",
-    "rRrRrRrRrRrRrRrR",
-    "rrrrrrrrrrrrrrrr",
-    "rRrRrRrRrRrRrRrR",
-    "rrrrrrrrrrrrrrrr",
-    "rRrRrRrRrRrRrRrR",
-    "rrrrrrrrrrrrrrrr",
-    "rRrRrRrRrRrRrRrR",
-    "rrrrrrrrrrrrrrrr",
-    "rRrRrRrRrRrRrRrR",
-    "rrrrrrrrrrrrrrrr",
-    "rRrRrRrRrRrRrRrR"
-  ],
   tree: [
     ".......T.......",
     "......TTT......",
@@ -85,23 +68,41 @@ const SPRITES = {
     "......TTT......",
     "......TTT......"
   ],
-  unit: [
-    "................",
-    ".......s........",
-    "......sss.......",
-    "......sss.......",
-    ".......s........",
-    "....ooooooo.....",
-    "...ooooooooo....",
-    "...ooooooooo....",
-    "...ooooooooo....",
-    "...ooooooooo....",
-    "....ooooooo.....",
-    ".......o........",
-    "......o.o.......",
-    ".....o...o......",
-    "................",
-    "................"
+  rice: [
+    "rrrrrrrrrrrrrrrr",
+    "rRrRrRrRrRrRrRrR",
+    "rrrrrrrrrrrrrrrr",
+    "rRrRrRrRrRrRrRrR",
+    "rrrrrrrrrrrrrrrr",
+    "rRrRrRrRrRrRrRrR",
+    "rrrrrrrrrrrrrrrr",
+    "rRrRrRrRrRrRrRrR",
+    "rrrrrrrrrrrrrrrr",
+    "rRrRrRrRrRrRrRrR",
+    "rrrrrrrrrrrrrrrr",
+    "rRrRrRrRrRrRrRrR",
+    "rrrrrrrrrrrrrrrr",
+    "rRrRrRrRrRrRrRrR",
+    "rrrrrrrrrrrrrrrr",
+    "rRrRrRrRrRrRrRrR"
+  ],
+  waterNode: [
+    "......WWWW......",
+    "....WWwwwwWW....",
+    "...WwwwwwwwwW...",
+    "..WwwwwwwwwwwW..",
+    "..WwwwwwwwwwwW..",
+    "...WwwwwwwwwW...",
+    "....WWwwwwWW....",
+    "......WWWW......",
+    "......WWWW......",
+    "....WWwwwwWW....",
+    "...WwwwwwwwwW...",
+    "..WwwwwwwwwwwW..",
+    "..WwwwwwwwwwwW..",
+    "...WwwwwwwwwW...",
+    "....WWwwwwWW....",
+    "......WWWW......"
   ],
   soldier: [
     "................",
@@ -213,22 +214,79 @@ const SPRITES = {
   ]
 };
 
-function drawSprite(name, x, y, scale = 1, override = {}) {
+const CACHE = new Map();
+
+export function drawSprite(ctx, name, x, y, opts = {}) {
   const spr = SPRITES[name];
   if (!spr) return;
-  const h = spr.length;
+  const {
+    scale = 1,
+    alpha = 1,
+    flipX = false,
+    flipY = false,
+    rotate = 0,
+    anchor = 'center',
+    shadow = false,
+    override = {}
+  } = opts;
   const w = spr[0].length;
-  const ctx = globalThis.ctx;
-  for (let j = 0; j < h; j++) {
-    const row = spr[j];
-    for (let i = 0; i < w; i++) {
-      const ch = row[i];
-      if (ch === '.') continue;
-      const color = override[ch] || PALETTE[ch] || '#000';
-      ctx.fillStyle = color;
-      ctx.fillRect(x + (i - w / 2) * scale, y + (j - h / 2) * scale, scale, scale);
+  const h = spr.length;
+  let canvas = null;
+  if (!flipX && !flipY && !rotate && alpha === 1 && !shadow) {
+    const key = name + '@' + scale + '@' + JSON.stringify(override);
+    canvas = CACHE.get(key);
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      canvas.width = w * scale;
+      canvas.height = h * scale;
+      const cctx = canvas.getContext('2d');
+      cctx.imageSmoothingEnabled = false;
+      for (let j = 0; j < h; j++) {
+        const row = spr[j];
+        for (let i = 0; i < w; i++) {
+          const ch = row[i];
+          if (ch === '.') continue;
+          const color = override[ch] || PALETTE[ch] || '#000';
+          cctx.fillStyle = color;
+          cctx.fillRect(i * scale, j * scale, scale, scale);
+        }
+      }
+      CACHE.set(key, canvas);
     }
   }
+  const tp = globalThis.toPixel || (v => v);
+  const px = tp(x);
+  const py = tp(y);
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.globalAlpha *= alpha;
+  if (shadow && globalThis.drawShadow) {
+    const r = (w * scale) / 2;
+    globalThis.drawShadow(px, py + r * 0.6, r);
+  }
+  ctx.translate(px, py);
+  if (rotate) ctx.rotate(rotate);
+  ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+  const ox = anchor === 'center' ? -w * scale / 2 : 0;
+  const oy = anchor === 'center' ? -h * scale / 2 : 0;
+  if (canvas) {
+    ctx.drawImage(canvas, ox, oy);
+  } else {
+    for (let j = 0; j < h; j++) {
+      const row = spr[j];
+      for (let i = 0; i < w; i++) {
+        const ch = row[i];
+        if (ch === '.') continue;
+        const color = override[ch] || PALETTE[ch] || '#000';
+        ctx.fillStyle = color;
+        ctx.fillRect(ox + i * scale, oy + j * scale, scale, scale);
+      }
+    }
+  }
+  ctx.restore();
 }
 
-Object.assign(globalThis, { drawSprite });
+export function drawSpriteLegacy(name, x, y, scale = 1, override = {}) {
+  if (!globalThis.ctx) return;
+  drawSprite(globalThis.ctx, name, x, y, { scale, override });
+}

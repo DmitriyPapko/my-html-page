@@ -242,6 +242,7 @@ export class Unit extends Entity {
     const s = globalThis.worldToScreen(this.x, this.y);
     const col = globalThis.players[this.owner]?.color || '#9fb2a1';
     const spr = this.isHero ? 'hero' : (this.type === 'archer' ? 'archer' : (this.type === 'mage' ? 'mage' : 'soldier'));
+    globalThis.drawShadow(s.x, s.y + 12 * globalThis.world.zoom, 12 * globalThis.world.zoom);
     globalThis.drawSprite(spr, s.x, s.y, globalThis.world.zoom * 1.25, { o: col });
     globalThis.drawHp(s.x, s.y - 18 * globalThis.world.zoom, this.hp / this.maxHp);
     if (this.auraTimer > 0) {
@@ -307,6 +308,7 @@ export class Structure extends Entity {
     const col = globalThis.players[this.owner]?.color || '#9fb2a1';
     const scale = globalThis.world.zoom * 5.25;
     const w = 16 * scale;
+    globalThis.drawShadow(s.x, s.y + w / 2, w / 2);
     globalThis.drawSprite('building', s.x, s.y, scale, { o: col });
     globalThis.drawHp(s.x, s.y - w / 2 - 10, this.hp / this.maxHp);
     if (this.selected) {
@@ -328,7 +330,8 @@ export class ResourceNode {
     if (!globalThis.isExplored(this.x, this.y)) return;
     const s = globalThis.worldToScreen(this.x, this.y);
     const scale = globalThis.world.zoom * (this.radius * 2 / 16);
-    globalThis.drawSprite(this.type === 'rice' ? 'rice' : 'water', s.x, s.y, scale);
+    globalThis.drawShadow(s.x, s.y + 8 * globalThis.world.zoom, this.radius * globalThis.world.zoom * 0.6);
+    globalThis.drawSprite(this.type === 'rice' ? 'rice' : 'waterNode', s.x, s.y, scale);
   }
 }
 
