@@ -45,6 +45,20 @@ function beep(freq = 440, dur = 0.08, type = 'triangle', gain = 0.06) {
   o.start(); g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + dur); o.stop(AC.currentTime + dur);
 }
 globalThis.beep = beep;
+
+function playSfx(name) {
+  if (globalThis.muted || !AC) return;
+  if (name === 'denied') {
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'sine';
+    o.frequency.value = 110;
+    o.connect(g); g.connect(AC.destination); g.gain.value = 0.08;
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + 0.25);
+    o.stop(AC.currentTime + 0.25);
+  }
+}
+globalThis.playSfx = playSfx;
 let simTime = 0;
 let gameOver = false;
 const weather = { type: 'sun', particles: [] };
@@ -94,11 +108,35 @@ function drawWeather(dt) {
 
       /* ==== Training & buildings ==== */
       const COSTS = { barracks: { rice: 180, water: 70 }, mBarracks: { rice: 220, water: 110 }, well: { rice: 140, water: 0 }, range: { rice: 160, water: 80 }, altar: { rice: 200, water: 140 }, square: { rice: 220, water: 120 } };
-      function placeGhost(owner, x, y, kind) { const cost = COSTS[kind] || { rice: 0, water: 0 }; const R = players[owner].res; if (R.rice < cost.rice || R.water < cost.water) return false; if (isBlocked(x, y)) return false; R.rice -= cost.rice; if (owner === 0) updateRes(); const g = new Structure(x, y, owner, kind, true); players[owner].structures.push(g); return true; }
-      function trainUnit(owner, barr, unitType) {
-        if (players[owner].units.filter(u => !u.dead && !u.isHero).length >= POP_CAP) return false;
+      function canPlaceBuildingAt(x, y) {
+        const R = 40;
+        if (x < R || y < R || x > world.width - R || y > world.height - R) return false;
+        if (isBlocked(x, y)) return false;
+        for (const n of riceNodes) { if (dist2(x, y, n.x, n.y) <= (n.radius + R) * (n.radius + R)) return false; }
+        for (const n of waterNodes) { if (dist2(x, y, n.x, n.y) <= (n.radius + R) * (n.radius + R)) return false; }
+        for (const p of players) { for (const s of p.structures) { if (dist2(x, y, s.x, s.y) <= (s.radius + R) * (s.radius + R)) return false; } }
+        return true;
+      }
+      function placeGhost(owner, x, y, kind) {
+        const cost = COSTS[kind] || { rice: 0, water: 0 };
+        const R = players[owner].res;
+        if (R.rice < cost.rice || R.water < cost.water) { if (owner === 0) playSfx('denied'); return false; }
+        if (!canPlaceBuildingAt(x, y)) { if (owner === 0) playSfx('denied'); return false; }
+        R.rice -= cost.rice; if (owner === 0) updateRes();
+        const g = new Structure(x, y, owner, kind, true); players[owner].structures.push(g); return true;
+      }
+      function enqueueUnit(barr, unitType) {
+        const owner = barr.owner;
         const cost = unitType === 'soldier' ? { rice: 60, water: 24 } : unitType === 'mage' ? { rice: 80, water: 46 } : unitType === 'archer' ? { rice: 70, water: 36 } : unitType === 'worker' ? { rice: 50, water: 12 } : { rice: 0, water: 0 };
-        const R = players[owner].res; if (R.rice < cost.rice || R.water < cost.water) return false; R.rice -= cost.rice; if (owner === 0) updateRes();
+        const R = players[owner].res;
+        if (R.rice < cost.rice || R.water < cost.water) { if (owner === 0) playSfx('denied'); return false; }
+        barr.queue.push(unitType);
+        return true;
+      }
+      function trainUnit(owner, barr, unitType) {
+        if (players[owner].units.filter(u => !u.dead && !u.isHero).length >= POP_CAP) { if (owner === 0) playSfx('denied'); return false; }
+        const cost = unitType === 'soldier' ? { rice: 60, water: 24 } : unitType === 'mage' ? { rice: 80, water: 46 } : unitType === 'archer' ? { rice: 70, water: 36 } : unitType === 'worker' ? { rice: 50, water: 12 } : { rice: 0, water: 0 };
+        const R = players[owner].res; if (R.rice < cost.rice || R.water < cost.water) { if (owner === 0) playSfx('denied'); return false; } R.rice -= cost.rice; if (owner === 0) updateRes();
         const u = new Unit(barr.x + 36, barr.y, owner, unitType);
         if (unitType === 'soldier') { u.dps = 30; u.maxHp = 160; u.hp = 160; u.attackRange = 30; u.regen = 0.35; }
         if (unitType === 'archer') { u.dps = 20; u.maxHp = 120; u.hp = 120; u.attackRange = 250; u.vision = 520; u.regen = 0.25; }
@@ -185,6 +223,15 @@ function drawWeather(dt) {
         const gain = tier === 1 ? 30 : (tier === 2 ? 60 : 90);
         heroGainExp(h, gain);
       }
+      const itemInfo = {
+        scroll_hp: { name: 'Свиток HP', desc: '+120 HP и +80 макс HP', rarity: 'Обычный' },
+        scroll_dps: { name: 'Свиток DPS', desc: '+10 DPS на 20с', rarity: 'Обычный' },
+        ring_atk: { name: 'Кольцо маны', desc: '+40 MP', rarity: 'Редкий' },
+        boots: { name: 'Сапоги', desc: '+20 скорость', rarity: 'Редкий' },
+        amulet: { name: 'Амулет', desc: '+120 HP', rarity: 'Редкий' },
+        orb: { name: 'Орб маны', desc: '+60 MP', rarity: 'Редкий' }
+      };
+      const invHotkeys = ['Q', 'E', 'R', 'G', 'T', 'Y'];
       function renderInventory(hero) {
         if (!hero || hero.dead) { invPanel.style.display = 'none'; invGrid.innerHTML = ''; return; }
         invPanel.style.display = 'block'; invGrid.innerHTML = '';
@@ -192,15 +239,17 @@ function drawWeather(dt) {
         for (let i = 0; i < cap; i++) {
           const slot = document.createElement('div'); slot.className = 'invSlot';
           if (arr[i]) {
-            const it = arr[i]; const names = { scroll_hp: 'Свиток HP', scroll_dps: 'Свиток DPS', ring_atk: 'Кольцо маны', boots: 'Сапоги', amulet: 'Амулет', orb: 'Орб маны' };
-            slot.textContent = names[it] || it;
-            slot.title = 'ЛКМ/ПКМ — использовать';
-            slot.onclick = (e) => { applyItem(hero, it); hero.inventory.splice(i, 1); renderInventory(hero); };
-            slot.oncontextmenu = (e) => { e.preventDefault(); applyItem(hero, it); hero.inventory.splice(i, 1); renderInventory(hero); };
+            const it = arr[i]; const inf = itemInfo[it];
+            slot.textContent = inf?.name || it;
+            const hk = invHotkeys[i];
+            slot.title = `${inf?.name || it}\n${inf?.desc || ''}\nРедкость: ${inf?.rarity || ''}\n[${hk}]`;
+            slot.onclick = (e) => { applyItem(hero, it); hero.inventory.splice(i, 1); renderInventory(hero); flashSlot(i); };
+            slot.oncontextmenu = (e) => { e.preventDefault(); applyItem(hero, it); hero.inventory.splice(i, 1); renderInventory(hero); flashSlot(i); };
           }
           invGrid.appendChild(slot);
         }
       }
+      function flashSlot(i) { const el = invGrid.children[i]; if (el) { el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 150); } }
       function applyItem(hero, itemKind) {
         if (itemKind === 'scroll_hp') {
           hero.maxHp += 80; hero.hp = Math.min(hero.maxHp, hero.hp + 120); if (typeof beep === 'function' && !muted) beep(620, 0.08, 'triangle', 0.05);
@@ -250,7 +299,26 @@ function drawWeather(dt) {
         }
       });
       cvs.addEventListener('contextmenu', e => { e.preventDefault(); if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; } });
-      window.addEventListener('keydown', e => { const k = e.key.toLowerCase(); input.keys[k] = true; if (k === 'f') globalThis.fogEnabled = !globalThis.fogEnabled; if (k === '1') tryCast(1); if (k === '2') tryCast(2); if (k === '3') tryCast(3); if (k === 'u') { const h = players[0].hero; if (h && h.inventory.length) { const it = h.inventory.shift(); applyItem(h, it); renderInventory(h); } } if (k === 'r') { resumeWorkers(players[0]); } });
+      window.addEventListener('keydown', e => {
+        const k = e.key.toLowerCase();
+        input.keys[k] = true;
+        if (k === 'f') globalThis.fogEnabled = !globalThis.fogEnabled;
+        if (k === '1') tryCast(1);
+        if (k === '2') tryCast(2);
+        if (k === '3') tryCast(3);
+        const idx = ['q','e','r','g','t','y'].indexOf(k);
+        if (idx >= 0) {
+          const h = players[0].hero;
+          if (h && h.inventory[idx]) {
+            const it = h.inventory[idx];
+            applyItem(h, it);
+            h.inventory.splice(idx, 1);
+            renderInventory(h);
+            flashSlot(idx);
+          } else { playSfx('denied'); }
+        }
+        if (k === 'r') { resumeWorkers(players[0]); }
+      });
       window.addEventListener('keyup', e => { input.keys[e.key.toLowerCase()] = false; });
 
       function entityAt(wx, wy) {
@@ -328,10 +396,10 @@ function drawWeather(dt) {
       function updateBuildingPanel() {
         const selected = players[0].structures.filter(s => s.selected && !s.isGhost && s.owner === 0); if (selected.length !== 1) { buildingPanel.style.display = 'none'; buildingPanel.innerHTML = ''; return; } const b = selected[0]; buildingPanel.style.display = 'flex'; buildingPanel.innerHTML = '';
         function add(label, cb) { const btn = document.createElement('button'); btn.className = 'btn'; btn.textContent = label; btn.onclick = () => { cb(); }; buildingPanel.appendChild(btn); }
-        if (b.kind === 'hq') { add('Рабочий (🍚50/💧12)', () => b.queue.push('worker')); }
-        if (b.kind === 'barracks') { add('Мечник (🍚60/💧24)', () => b.queue.push('soldier')); }
-        if (b.kind === 'mBarracks') { add('Маг (🍚80/💧46)', () => b.queue.push('mage')); }
-        if (b.kind === 'range') { add('Лучник (🍚70/💧36)', () => b.queue.push('archer')); }
+        if (b.kind === 'hq') { add('Рабочий (🍚50/💧12)', () => enqueueUnit(b, 'worker')); }
+        if (b.kind === 'barracks') { add('Мечник (🍚60/💧24)', () => enqueueUnit(b, 'soldier')); }
+        if (b.kind === 'mBarracks') { add('Маг (🍚80/💧46)', () => enqueueUnit(b, 'mage')); }
+        if (b.kind === 'range') { add('Лучник (🍚70/💧36)', () => enqueueUnit(b, 'archer')); }
         if (b.kind === 'altar') { add('Возродить героя', () => { const P = players[0]; if ((!P.hero || P.hero.dead) && !b.queue.includes('hero')) { b.queue.push('hero'); } }); }
       }
       function renderWorkerBuildPanel() {
@@ -366,8 +434,13 @@ function drawWeather(dt) {
             t = 'Здание: ' + (names[e.kind] || e.kind);
             extra = `HP: ${(e.hp | 0)}/${(e.maxHp | 0)}\nOwner: ${owner}`;
           } else {
-            t = 'Нейтрал';
-            extra = `HP: ${(e.hp | 0)}/${(e.maxHp | 0)}\nTier: ${e.tier}`;
+            t = e.displayName || 'Нейтрал';
+            const names = { scroll_hp: 'Свиток HP', scroll_dps: 'Свиток DPS', ring_atk: 'Кольцо маны', boots: 'Сапоги', amulet: 'Амулет', orb: 'Орб маны' };
+            let loot = '';
+            if (e.lootTable) {
+              loot = e.lootTable.map(l => `${names[l.item] || l.item} (${Math.round(l.chance * 100)}%)`).join(', ');
+            }
+            extra = `HP: ${(e.hp | 0)}/${(e.maxHp | 0)}\nTier: ${e.tier}\nВозможный лут: ${loot}`;
           }
           statsPanel.textContent = t + '\n' + extra;
         } else {
@@ -398,7 +471,7 @@ function drawWeather(dt) {
       }
 
       /* ==== Utils ==== */
-      Object.assign(globalThis, { players, neutral, drops, projectiles, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes, placeGhost, trainUnit, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel, updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, getById, enemiesFor, Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, input, setHeroUI, spawnHero });
+      Object.assign(globalThis, { players, neutral, drops, projectiles, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes, canPlaceBuildingAt, placeGhost, enqueueUnit, trainUnit, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel, updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, getById, enemiesFor, Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, input, setHeroUI, spawnHero });
 
       await import("./ui.js");
 await import("./terrain.js");
@@ -490,6 +563,14 @@ globalThis.drawHp = drawHp;
         for (const pr of projectiles) pr.draw();
         drawWeather(dt);
         drawFog();
+        if (input.buildMode) {
+          const can = canPlaceBuildingAt(input.wx, input.wy);
+          const s = worldToScreen(input.wx, input.wy);
+          const size = 72 * world.zoom;
+          ctx.strokeStyle = can ? 'rgba(0,255,0,0.6)' : 'rgba(255,0,0,0.6)';
+          ctx.lineWidth = 2 * world.zoom;
+          ctx.strokeRect(s.x - size / 2, s.y - size / 2, size, size);
+        }
         if (input.rectSelecting) {
           const rx = Math.min(input.rectStartX, input.x);
           const ry = Math.min(input.rectStartY, input.y);
@@ -515,9 +596,9 @@ globalThis.drawHp = drawHp;
         if (k === 't') startBuild('well');
         if (k === 'l') startBuild('range');
         if (k === 'h') startBuild('altar');
-        if (k === 'q') { const b = players[0].structures.find(s => s.kind === 'barracks' && !s.isGhost && s.owner === 0 && s.selected); if (b) b.queue.push('soldier'); }
-        if (k === 'w') { const b = players[0].structures.find(s => s.kind === 'range' && !s.isGhost && s.owner === 0 && s.selected); if (b) b.queue.push('archer'); }
-        if (k === 'e') { const b = players[0].structures.find(s => s.kind === 'mBarracks' && !s.isGhost && s.owner === 0 && s.selected); if (b) b.queue.push('mage'); }
+        if (k === 'q') { const b = players[0].structures.find(s => s.kind === 'barracks' && !s.isGhost && s.owner === 0 && s.selected); if (b) enqueueUnit(b, 'soldier'); }
+        if (k === 'w') { const b = players[0].structures.find(s => s.kind === 'range' && !s.isGhost && s.owner === 0 && s.selected); if (b) enqueueUnit(b, 'archer'); }
+        if (k === 'e') { const b = players[0].structures.find(s => s.kind === 'mBarracks' && !s.isGhost && s.owner === 0 && s.selected); if (b) enqueueUnit(b, 'mage'); }
       });
 
       function startBuild(kind) { input.buildMode = kind; document.getElementById('buildTip').style.display = 'block'; }

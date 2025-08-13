@@ -259,11 +259,35 @@ export class Unit extends Entity {
     ctx.fill();
     ctx.fillStyle = col;
     ctx.fillRect(-8, -2, 16, 4);
-    if (this.type === 'soldier') {
+    // unique icons for unit types
+    if (this.type === 'worker') {
+      // small hammer on the side
+      ctx.strokeStyle = '#ccc';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(10, -6);
+      ctx.lineTo(14, -10);
+      ctx.moveTo(10, -6);
+      ctx.lineTo(14, -2);
+      ctx.stroke();
+    } else if (this.type === 'soldier') {
+      // blade for swordsman
       ctx.fillStyle = '#ccc';
-      ctx.fillRect(-12, -4, 4, 8);
-    }
-    if (this.type === 'mage') {
+      ctx.beginPath();
+      ctx.moveTo(-12, -4);
+      ctx.lineTo(-8, 0);
+      ctx.lineTo(-12, 4);
+      ctx.closePath();
+      ctx.fill();
+    } else if (this.type === 'archer') {
+      // bow arc
+      ctx.strokeStyle = '#da8';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(12, 0, 6, -Math.PI / 2, Math.PI / 2);
+      ctx.stroke();
+    } else if (this.type === 'mage') {
+      // magic orb/staff
       ctx.fillStyle = '#8ad';
       ctx.beginPath();
       ctx.arc(0, -14, 4, 0, 6.283);
@@ -343,12 +367,34 @@ export class Structure extends Entity {
     const w = 16 * scale;
     globalThis.drawShadow(s.x, s.y + w / 2, w / 2);
     globalThis.drawSprite('building', s.x, s.y, scale, { o: col });
+    // faction flag
+    const ctx = globalThis.ctx;
+    const zoom = globalThis.world.zoom;
+    ctx.save();
+    ctx.translate(s.x + w / 2 - 6 * zoom, s.y - w / 2 - 8 * zoom);
+    ctx.scale(zoom, zoom);
+    const t = performance.now() / 400;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, -14);
+    ctx.stroke();
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    const wave = Math.sin(t) * 3;
+    ctx.moveTo(0, -14);
+    ctx.lineTo(12 + wave, -10);
+    ctx.lineTo(0, -6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
     globalThis.drawHp(s.x, s.y - w / 2 - 10, this.hp / this.maxHp);
     if (this.selected) {
       globalThis.ctx.strokeStyle = '#7ac8ff';
       globalThis.ctx.strokeRect(s.x - w / 2 - 4, s.y - w / 2 - 4, w + 8, w + 8);
     }
-    if (this.queue.length > 0) {
+    if (this.queue.length > 0 && this.owner === 0) {
       const ctx = globalThis.ctx;
       const zoom = globalThis.world.zoom;
       const barY = s.y + w / 2 + 6 * zoom;
@@ -435,10 +481,26 @@ export class NeutralCreep extends Entity {
   constructor(x, y, kind = 'beast') {
     super(x, y, -1);
     this.kind = kind;
-    if (kind === 'mage') { this.maxHp = 140; this.dps = 24; this.attackRange = 260; this.leash = 340; this.tier = 1; }
-    else if (kind === 'gnome') { this.maxHp = 220; this.dps = 22; this.attackRange = 50; this.leash = 360; this.block = 0.25; this.tier = 2; }
-    else if (kind === 'troll') { this.maxHp = 500; this.dps = 40; this.attackRange = 40; this.leash = 380; this.tier = 3; }
-    else { this.maxHp = 360; this.dps = 30; this.attackRange = 30; this.leash = 360; this.tier = 2; this.kind = 'beast'; }
+    if (kind === 'mage') {
+      this.maxHp = 140; this.dps = 24; this.attackRange = 260; this.leash = 340; this.tier = 1;
+      this.displayName = 'Отшельник‑маг';
+      this.lootTable = [{ item: 'scroll_dps', chance: 0.4 }, { item: 'orb', chance: 0.2 }];
+    }
+    else if (kind === 'gnome') {
+      this.maxHp = 220; this.dps = 22; this.attackRange = 50; this.leash = 360; this.block = 0.25; this.tier = 2;
+      this.displayName = 'Гном‑искатель';
+      this.lootTable = [{ item: 'scroll_hp', chance: 0.4 }, { item: 'ring_atk', chance: 0.2 }];
+    }
+    else if (kind === 'troll') {
+      this.maxHp = 500; this.dps = 40; this.attackRange = 40; this.leash = 380; this.tier = 3;
+      this.displayName = 'Лесной тролль';
+      this.lootTable = [{ item: 'boots', chance: 0.3 }, { item: 'amulet', chance: 0.15 }];
+    }
+    else {
+      this.maxHp = 360; this.dps = 30; this.attackRange = 30; this.leash = 360; this.tier = 2; this.kind = 'beast';
+      this.displayName = 'Дикий зверь';
+      this.lootTable = [{ item: 'scroll_hp', chance: 0.4 }, { item: 'scroll_dps', chance: 0.2 }];
+    }
     this.hp = this.maxHp;
     this.radius = 12 + 4 * (this.tier - 1);
     this.homeX = x;
@@ -510,10 +572,33 @@ export class NeutralCreep extends Entity {
     ctx.fill();
     ctx.fillStyle = band;
     ctx.fillRect(-8, -2, 16, 4);
+    // small icons by type
     if (this.kind === 'mage') {
       ctx.fillStyle = '#8ad';
       ctx.beginPath();
       ctx.arc(0, -14, 4, 0, 6.283);
+      ctx.fill();
+    } else if (this.kind === 'gnome') {
+      ctx.fillStyle = '#b86';
+      ctx.fillRect(-10, -12, 8, 4);
+    } else if (this.kind === 'troll') {
+      ctx.fillStyle = '#a44';
+      ctx.beginPath();
+      ctx.moveTo(-8, -12);
+      ctx.lineTo(-2, -16);
+      ctx.lineTo(2, -12);
+      ctx.lineTo(8, -16);
+      ctx.lineTo(8, -12);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      ctx.fillStyle = '#9fb2a1';
+      ctx.beginPath();
+      ctx.moveTo(-10, -12);
+      ctx.lineTo(-6, -16);
+      ctx.lineTo(-2, -12);
+      ctx.lineTo(2, -16);
+      ctx.lineTo(6, -12);
       ctx.fill();
     }
     ctx.restore();
