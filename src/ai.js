@@ -74,6 +74,19 @@ function aiThink(dt, id) {
     const nt = nearestNeutralCamp(P, neutral, dist2);
     if (nt) { army.forEach(u => { if (!u.retreat) u.setTarget(nt); }); }
   }
+  // нападение при преимуществе
+  const enemyUnits = players[0].units.filter(u => !u.dead);
+  for (const u of army) {
+    const seen = enemyUnits.filter(e => Math.hypot(e.x - u.x, e.y - u.y) < u.vision);
+    if (seen.length) {
+      const enemyCount = seen.length;
+      const myCount = army.filter(a => Math.hypot(a.x - u.x, a.y - u.y) < u.vision).length;
+      if (myCount > enemyCount) {
+        army.forEach(a => { if (!a.retreat) a.setTarget(seen[0]); });
+      }
+      break;
+    }
+  }
   // army rally / attack
   if (army.length >= P.aiPlan.pushAt) {
     const enemyHero = players[0].hero && !players[0].hero.dead ? players[0].hero : null;

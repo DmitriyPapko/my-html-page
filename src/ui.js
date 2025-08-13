@@ -10,8 +10,8 @@ globalThis.paused = true;
 globalThis.muted = false;
 globalThis.fogEnabled = true;
 
-btnStart.onclick = () => { globalThis.paused = false; menu.style.display = 'none'; };
-  btnRestart.onclick = () => { globalThis.resetGame(); globalThis.paused = false; menu.style.display = 'none'; };
+btnStart.onclick = async () => { await globalThis.resetGame(); globalThis.paused = false; menu.style.display = 'none'; };
+  btnRestart.onclick = async () => { await globalThis.resetGame(); globalThis.paused = false; menu.style.display = 'none'; };
 btnMute.onclick = () => { globalThis.muted = !globalThis.muted; btnMute.textContent = globalThis.muted ? 'Звук: выкл' : 'Звук: вкл'; };
 btnPause.onclick = () => { globalThis.paused = !globalThis.paused; menu.style.display = globalThis.paused ? 'flex' : 'none'; };
 btnFog.onclick = () => { globalThis.fogEnabled = !globalThis.fogEnabled; btnFog.textContent = globalThis.fogEnabled ? 'No Fog' : 'Fog'; };

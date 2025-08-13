@@ -166,7 +166,11 @@ export class Unit extends Entity {
       this.attackCd -= dt;
       if (this.attackCd <= 0) {
         this.attackCd = .55;
-        target.damage(this.dps, this.owner);
+        if (this.attackRange > 80) {
+          globalThis.projectiles.push(new Projectile(this.x, this.y, target.id, this.owner, this.dps));
+        } else {
+          target.damage(this.dps, this.owner);
+        }
         if (!globalThis.muted) globalThis.beep(220 + this.dps, 0.05, 'square', 0.03);
       }
     }
@@ -227,7 +231,8 @@ export class Unit extends Entity {
     if (this.owner !== 0 && !globalThis.isVisible(this.x, this.y)) return;
     const s = globalThis.worldToScreen(this.x, this.y);
     const col = globalThis.players[this.owner]?.color || '#9fb2a1';
-    globalThis.drawSprite('unit', s.x, s.y, globalThis.world.zoom * 1.25, { o: col });
+    const spr = this.isHero ? 'hero' : (this.type === 'archer' ? 'archer' : (this.type === 'mage' ? 'mage' : 'soldier'));
+    globalThis.drawSprite(spr, s.x, s.y, globalThis.world.zoom * 1.25, { o: col });
     globalThis.drawHp(s.x, s.y - 18 * globalThis.world.zoom, this.hp / this.maxHp);
     if (this.auraTimer > 0) {
       globalThis.ctx.strokeStyle = 'rgba(255,215,0,0.5)';
@@ -327,6 +332,32 @@ export class ItemDrop extends Entity {
     globalThis.ctx.fillStyle = '#000';
     globalThis.ctx.font = `${12 * globalThis.world.zoom}px system-ui`;
     globalThis.ctx.fillText(map[this.kind] || this.kind, s.x - 16 * globalThis.world.zoom, s.y + 14 * globalThis.world.zoom);
+  }
+}
+
+export class Projectile extends Entity {
+  constructor(x, y, targetId, owner, dmg) {
+    super(x, y, owner);
+    this.targetId = targetId;
+    this.dmg = dmg;
+    this.speed = 520;
+    this.radius = 4;
+  }
+  update(dt) {
+    const tgt = getById(this.targetId);
+    if (!tgt || tgt.dead) { this.dead = true; return; }
+    const dx = tgt.x - this.x, dy = tgt.y - this.y;
+    const d = Math.hypot(dx, dy);
+    if (d < this.speed * dt) { tgt.damage(this.dmg, this.owner); this.dead = true; }
+    else { this.x += dx / d * this.speed * dt; this.y += dy / d * this.speed * dt; }
+  }
+  draw() {
+    if (this.owner !== 0 && !globalThis.isVisible(this.x, this.y)) return;
+    const s = globalThis.worldToScreen(this.x, this.y);
+    globalThis.ctx.fillStyle = '#ffd27a';
+    globalThis.ctx.beginPath();
+    globalThis.ctx.arc(s.x, s.y, 3 * globalThis.world.zoom, 0, 6.283);
+    globalThis.ctx.fill();
   }
 }
 

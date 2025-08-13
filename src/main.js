@@ -1,5 +1,5 @@
 import "./sprites.js";
-import { Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, getById, enemiesFor, allUnits, allStructures, nearestNode, lootFromTier } from "./entities.js";
+import { Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, getById, enemiesFor, allUnits, allStructures, nearestNode, lootFromTier } from "./entities.js";
 
 /* ==== Helpers ==== */
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -28,7 +28,7 @@ function beep(freq = 440, dur = 0.08, type = 'triangle', gain = 0.06) {
 }
 globalThis.beep = beep;
 let simTime = 0;
-      const neutral = { units: [] }, drops = [];
+      const neutral = { units: [] }, drops = [], projectiles = [];
 
       /* ==== Players & economy ==== */
       const players = [
@@ -58,7 +58,8 @@ let simTime = 0;
       }
 
       /* ==== Hero & abilities ==== */
-      const abilityBar = document.getElementById('abilityBar'); const heroName = document.getElementById('heroName'), heroHP = document.getElementById('heroHP'), heroMP = document.getElementById('heroMP'), heroLVL = document.getElementById('heroLVL'); const ab1 = document.getElementById('ab1'), ab2 = document.getElementById('ab2'), ab3 = document.getElementById('ab3'); const invPanel = document.getElementById('invPanel'), invGrid = document.getElementById('invGrid');
+      const abilityBar = document.getElementById('abilityBar'); const abilityDesc = document.getElementById('abilityDesc');
+      const heroName = document.getElementById('heroName'), heroHP = document.getElementById('heroHP'), heroMP = document.getElementById('heroMP'), heroLVL = document.getElementById('heroLVL'); const ab1 = document.getElementById('ab1'), ab2 = document.getElementById('ab2'), ab3 = document.getElementById('ab3'); const invPanel = document.getElementById('invPanel'), invGrid = document.getElementById('invGrid');
       const abilityInfo = {
         paladin: {
           1: 'Исцеление (40 маны): лечит союзников на 90 HP в радиусе 180.',
@@ -77,8 +78,8 @@ let simTime = 0;
         }
       };
       function setHeroUI(h) {
-        if (!h) { abilityBar.style.display = 'none'; invPanel.style.display = 'none'; return; }
-        abilityBar.style.display = 'block'; invPanel.style.display = 'block';
+        if (!h) { abilityBar.style.display = 'none'; abilityDesc.style.display = 'none'; invPanel.style.display = 'none'; return; }
+        abilityBar.style.display = 'block'; abilityDesc.style.display = 'block'; invPanel.style.display = 'block';
         heroName.textContent = h.heroName + ' (' + h.heroClass + ')';
         heroHP.textContent = `HP ${h.hp | 0}/${h.maxHp | 0}`;
         heroMP.textContent = `MP ${h.mp | 0}/${h.maxMp | 0}`;
@@ -87,6 +88,7 @@ let simTime = 0;
         ab1.title = info[1] || '';
         ab2.title = info[2] || '';
         ab3.title = info[3] || '';
+        abilityDesc.innerHTML = `${info[1] || ''}<br>${info[2] || ''}<br>${info[3] || ''}`;
       }
       ab1.onclick = () => tryCast(1); ab2.onclick = () => tryCast(2); ab3.onclick = () => tryCast(3);
       function spawnHero(owner, x, y, cls = null) {
@@ -100,14 +102,16 @@ let simTime = 0;
         players[owner].units.push(h); players[owner].hero = h; return h;
       }
       function chooseHeroClass() {
-        let cls = null;
-        const allowed = ['paladin', 'rogue', 'archmage'];
-        while (!allowed.includes(cls)) {
-          cls = prompt('Выберите героя: paladin, rogue или archmage', 'paladin');
-          if (cls === null) return 'paladin';
-          cls = cls.trim().toLowerCase();
-        }
-        return cls;
+        return new Promise(res => {
+          const panel = document.getElementById('heroSelect');
+          panel.style.display = 'flex';
+          panel.querySelectorAll('button').forEach(b => {
+            b.onclick = () => {
+              panel.style.display = 'none';
+              res(b.dataset.cls);
+            };
+          });
+        });
       }
       function heroGainFromNeutral(owner, tier) {
         const h = players[owner]?.hero; if (!h || h.dead) return;
@@ -230,7 +234,7 @@ let simTime = 0;
         if (b.kind === 'barracks') { add('Мечник (🍚60/💧24)', () => b.queue.push('soldier')); }
         if (b.kind === 'mBarracks') { add('Маг (🍚80/💧46)', () => b.queue.push('mage')); }
         if (b.kind === 'range') { add('Лучник (🍚70/💧36)', () => b.queue.push('archer')); }
-        if (b.kind === 'altar') { add('Возродить героя', () => { const P = players[0]; if (!P.hero || P.hero.dead) { spawnHero(0, b.x + 40, b.y - 20, P.chosenClass); } }); }
+        if (b.kind === 'altar') { add('Возродить героя', () => { const P = players[0]; if (!P.hero || P.hero.dead) { setTimeout(() => spawnHero(0, b.x + 40, b.y - 20, P.chosenClass), 20000); } }); }
       }
       function renderWorkerBuildPanel() {
         const selected = players[0].units.filter(u => u.selected && u.type === 'worker'); if (selected.length === 0) { workerBuild.style.display = 'none'; workerBuild.innerHTML = ''; return; } workerBuild.style.display = 'flex'; workerBuild.innerHTML = '';
@@ -245,7 +249,33 @@ let simTime = 0;
 
       /* ==== Stats panel ==== */
       const statsPanel = document.getElementById('statsPanel');
-      function updateStatsPanel() { const targets = [...players[0].units, ...players[0].structures, ...players[1].units, ...players[1].structures, ...players[2].units, ...players[2].structures, ...neutral.units]; const selected = targets.filter(e => e.selected); if (selected.length === 1) { const e = selected[0]; const owner = e.owner >= 0 ? players[e.owner].name : 'Neutral'; let t, extra = ''; if (e instanceof Unit) { t = e.isHero ? ('Герой: ' + (e.heroName || '')) : 'Юнит: ' + e.type; extra = `DPS: ${e.dps | 0}\nRange: ${e.attackRange | 0}\nVision: ${e.vision | 0}\nOwner: ${owner}`; } else if (e instanceof Structure) { t = 'Здание: ' + e.kind; extra = `HP: ${(e.hp | 0)}/${(e.maxHp | 0)}\nOwner: ${owner}`; } else { t = 'Нейтрал'; extra = `HP: ${(e.hp | 0)}/${(e.maxHp | 0)}\nTier: ${e.tier}`; } statsPanel.textContent = t + '\n' + extra; } else { statsPanel.textContent = '—'; } }
+      function updateStatsPanel() {
+        const targets = [...players[0].units, ...players[0].structures, ...players[1].units, ...players[1].structures, ...players[2].units, ...players[2].structures, ...neutral.units];
+        const selected = targets.filter(e => e.selected);
+        if (selected.length === 1) {
+          const e = selected[0];
+          const owner = e.owner >= 0 ? players[e.owner].name : 'Neutral';
+          let t, extra = '';
+          if (e instanceof Unit) {
+            t = e.isHero ? ('Герой: ' + (e.heroName || '')) : 'Юнит: ' + e.type;
+            extra = `DPS: ${e.dps | 0}\nRange: ${e.attackRange | 0}\nVision: ${e.vision | 0}\nOwner: ${owner}`;
+            if (e.type === 'mage' && !e.isHero) {
+              abilityDesc.style.display = 'block';
+              abilityDesc.textContent = 'Маг: наносит урон с расстояния и поддерживает союзников.';
+            }
+          } else if (e instanceof Structure) {
+            t = 'Здание: ' + e.kind;
+            extra = `HP: ${(e.hp | 0)}/${(e.maxHp | 0)}\nOwner: ${owner}`;
+          } else {
+            t = 'Нейтрал';
+            extra = `HP: ${(e.hp | 0)}/${(e.maxHp | 0)}\nTier: ${e.tier}`;
+          }
+          statsPanel.textContent = t + '\n' + extra;
+        } else {
+          statsPanel.textContent = '—';
+          setHeroUI(players[0].hero);
+        }
+      }
 
       /* ==== Minimap ==== */
       mini.addEventListener('click', e => { const r = mini.getBoundingClientRect(); const mx = (e.clientX - r.left) / r.width, my = (e.clientY - r.top) / r.height; world.camX = mx * world.width - (cvs.width / DPR) / world.zoom / 2; world.camY = my * world.height - (cvs.height / DPR) / world.zoom / 2; });
@@ -258,7 +288,7 @@ let simTime = 0;
       }
 
       /* ==== Utils ==== */
-Object.assign(globalThis, { players, neutral, drops, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes, placeGhost, trainUnit, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel, updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, getById, enemiesFor, Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, input });
+Object.assign(globalThis, { players, neutral, drops, projectiles, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes, placeGhost, trainUnit, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel, updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, getById, enemiesFor, Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, input });
 
       await import("./ui.js");
 await import("./terrain.js");
@@ -266,12 +296,12 @@ await import("./fog.js");
 await import("./ai.js");
 
 /* ==== Setup/Reset ==== */
-      function resetGame() {
+      async function resetGame() {
         genBlockers();
         for (const p of players) { p.units.length = 0; p.structures.length = 0; p.hero = null; p.res.rice = 220; p.res.water = 100; p.aiPlan = null; }
         neutral.units.length = 0; drops.length = 0; riceNodes.length = 0; waterNodes.length = 0; explored.fill(0); visible.fill(0); updateRes();
         const pos = [{ x: 900, y: 900 }, { x: world.width - 1200, y: 1200 }, { x: world.width - 1800, y: world.height - 1400 }];
-        const playerClass = chooseHeroClass();
+        const playerClass = await chooseHeroClass();
         for (let i = 0; i < 3; i++) {
           const HQ = new Structure(pos[i].x, pos[i].y, i, 'hq', false); players[i].structures.push(HQ);
           for (let k = 0; k < 6; k++) { const w = new Unit(HQ.x + (k % 3) * 24, HQ.y + 60 + Math.floor(k / 3) * 24, i, 'worker'); players[i].units.push(w); w.role = (k % 2 === 0) ? 'rice' : 'water'; } // 3/3
@@ -286,7 +316,6 @@ await import("./ai.js");
         revealCircle(players[0].structures[0].x, players[0].structures[0].y, 900);
         world.camX = players[0].structures[0].x - 400; world.camY = players[0].structures[0].y - 300;
       }
-      resetGame();
 globalThis.resetGame = resetGame;
 
       /* ==== Loot & pickup ==== */
@@ -302,16 +331,19 @@ globalThis.drawHp = drawHp;
         if (!globalThis.paused) {
           const sp = 900 / world.zoom; if (input.keys['w'] || input.keys['ц']) world.camY -= sp * dt; if (input.keys['s'] || input.keys['ы']) world.camY += sp * dt; if (input.keys['a'] || input.keys['ф']) world.camX -= sp * dt; if (input.keys['d'] || input.keys['в']) world.camX += sp * dt;
           for (const p of players) { for (const s of p.structures) s.update(dt); for (const u of p.units) u.update(dt); if (p.ai) aiThink(dt, players.indexOf(p)); }
-          for (const n of neutral.units) { n.update(dt); if (n.dead && !n.awarded) { if (n.lastHitBy != null && n.lastHitBy >= 0) { heroGainFromNeutral(n.lastHitBy, n.tier); if (Math.random() < 0.5) { drops.push(new ItemDrop(n.x + rand(-10, 10), n.y + rand(-10, 10), lootFromTier(n.tier))); } } n.awarded = true; } }
+          // нейтралы больше не роняют предметы
+          for (const n of neutral.units) { n.update(dt); if (n.dead && !n.awarded) { if (n.lastHitBy != null && n.lastHitBy >= 0) { heroGainFromNeutral(n.lastHitBy, n.tier); } n.awarded = true; } }
           // cleanup neutrals (remove processed corpses)
           for (let i = neutral.units.length - 1; i >= 0; i--) { if (neutral.units[i].dead && neutral.units[i].awarded) { neutral.units.splice(i, 1); } }
+          for (const pr of projectiles) pr.update(dt);
+          for (let i = projectiles.length - 1; i >= 0; i--) if (projectiles[i].dead) projectiles.splice(i, 1);
           tryPickup();
           // cleanup players lists
           for (const p of [players[0], players[1], players[2]]) { p.units = p.units.filter(u => !u.dead); p.structures = p.structures.filter(s => !s.dead); }
         }
         ctx.clearRect(0, 0, cvs.width, cvs.height);
         drawTerrain();
-        const drawables = allStructures().concat(allUnits(), neutral.units, riceNodes, waterNodes, drops); drawables.sort((a, b) => a.y - b.y);
+        const drawables = allStructures().concat(allUnits(), neutral.units, projectiles, riceNodes, waterNodes, drops); drawables.sort((a, b) => a.y - b.y);
         for (const e of drawables) { if (e.draw) e.draw(); }
         drawFog();
         // cursor
