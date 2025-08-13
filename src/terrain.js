@@ -1,8 +1,9 @@
 /* ==== Simple terrain + blockers (лес/река) ==== */
 // Генерим «реки» (непроходимые) как вертикальные полосы и «лес» как кучки препятствий
-const blockers = []; // {x,y,r}
-function genBlockers() {
-  const { rand, clamp, world } = globalThis;
+import { rand, clamp, world, ctx, cvs, worldToScreen, dist2 } from './main.js';
+
+export const blockers = []; // {x,y,r}
+export function genBlockers() {
   blockers.length = 0;
   for (let i = 0; i < 4; i++) {
     const x = 2000 + i * 2500 + rand(-400, 400);
@@ -14,8 +15,7 @@ function genBlockers() {
     blockers.push({ x: rand(600, world.width - 600), y: rand(600, world.height - 600), r: clamp(rand(24, 60), 24, 60) });
   }
 }
-function drawTerrain() {
-  const { ctx, world, cvs, worldToScreen } = globalThis;
+export function drawTerrain() {
   ctx.save(); ctx.scale(world.zoom, world.zoom);
   const step = 96;
   const startX = Math.floor(world.camX / step) * step,
@@ -39,11 +39,9 @@ function drawTerrain() {
   }
   ctx.restore();
 }
-function isBlocked(wx, wy) {
-  const { dist2 } = globalThis;
+export function isBlocked(wx, wy) {
   for (const b of blockers) {
     if (dist2(wx, wy, b.x, b.y) <= (b.r + 10) * (b.r + 10)) return true;
   }
   return false;
 }
-Object.assign(globalThis, { blockers, genBlockers, drawTerrain, isBlocked });

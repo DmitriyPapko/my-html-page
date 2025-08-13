@@ -1,15 +1,15 @@
 /* ==== Fog of war ==== */
-const F_W = 180, F_H = 120;
-const explored = new Uint8Array(F_W * F_H), visible = new Uint8Array(F_W * F_H);
-function fogIndex(wx, wy) {
-  const { clamp, world } = globalThis;
+import { clamp, world, fogEnabled, cvs, ctx, DPR } from './main.js';
+
+export const F_W = 180, F_H = 120;
+export const explored = new Uint8Array(F_W * F_H), visible = new Uint8Array(F_W * F_H);
+export function fogIndex(wx, wy) {
   const x = clamp(Math.floor(wx / world.width * F_W), 0, F_W - 1);
   const y = clamp(Math.floor(wy / world.height * F_H), 0, F_H - 1);
   return y * F_W + x;
 }
-function clearVisible() { visible.fill(0); }
-function revealCircle(wx, wy, r) {
-  const { clamp, world } = globalThis;
+export function clearVisible() { visible.fill(0); }
+export function revealCircle(wx, wy, r) {
   const cx = Math.floor(wx / world.width * F_W), cy = Math.floor(wy / world.height * F_H), rr = (r / world.width * F_W), R2 = rr * rr;
   const x0 = clamp(Math.floor(cx - rr - 1), 0, F_W - 1), x1 = clamp(Math.ceil(cx + rr + 1), 0, F_W - 1);
   const y0 = clamp(Math.floor(cy - rr - 1), 0, F_H - 1), y1 = clamp(Math.ceil(cy + rr + 1), 0, F_H - 1);
@@ -20,10 +20,9 @@ function revealCircle(wx, wy, r) {
     }
   }
 }
-function isVisible(wx, wy) { return !globalThis.fogEnabled || visible[fogIndex(wx, wy)] === 1; }
-function isExplored(wx, wy) { return !globalThis.fogEnabled || explored[fogIndex(wx, wy)] === 1; }
-function drawFog() {
-  const { fogEnabled, cvs, ctx, DPR, world } = globalThis;
+export function isVisible(wx, wy) { return !fogEnabled || visible[fogIndex(wx, wy)] === 1; }
+export function isExplored(wx, wy) { return !fogEnabled || explored[fogIndex(wx, wy)] === 1; }
+export function drawFog() {
   if (!fogEnabled) return;
   const w = cvs.width, h = cvs.height;
   const img = ctx.createImageData(w, h);
@@ -44,4 +43,3 @@ function drawFog() {
   }
   ctx.putImageData(img, 0, 0);
 }
-Object.assign(globalThis, { F_W, F_H, explored, visible, fogIndex, clearVisible, revealCircle, isVisible, isExplored, drawFog });

@@ -1,11 +1,18 @@
+import { genBlockers, drawTerrain, isBlocked } from './terrain.js';
+import { clearVisible, revealCircle, isVisible, drawFog } from './fog.js';
+import { aiThink } from './ai.js';
+import './ui.js';
+
 /* ==== Helpers ==== */
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rand = (a, b) => a + Math.random() * (b - a);
 const dist2 = (x1, y1, x2, y2) => { const dx = x2 - x1, dy = y2 - y1; return dx * dx + dy * dy; };
 
 /* ==== Canvas & camera ==== */
-const cvs = document.getElementById('game'), ctx = cvs.getContext('2d'); ctx.imageSmoothingEnabled = false;
-const mini = document.getElementById('minimap'), mctx = mini.getContext('2d'); mctx.imageSmoothingEnabled = false;
+const cvs = document.getElementById('game');
+const ctx = cvs.getContext('2d'); ctx.imageSmoothingEnabled = false;
+const mini = document.getElementById('minimap');
+const mctx = mini.getContext('2d'); mctx.imageSmoothingEnabled = false;
 const DPR = Math.max(1, window.devicePixelRatio || 1);
 const world = { width: 12000, height: 8000, camX: 0, camY: 0, zoom: 1 };
 function resize() { const w = cvs.clientWidth, h = cvs.clientHeight; cvs.width = Math.floor(w * DPR); cvs.height = Math.floor(h * DPR); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
@@ -13,17 +20,21 @@ new ResizeObserver(resize).observe(cvs); resize();
 function screenToWorld(sx, sy) { return { x: sx / world.zoom + world.camX, y: sy / world.zoom + world.camY }; }
 function worldToScreen(wx, wy) { return { x: (wx - world.camX) * world.zoom, y: (wy - world.camY) * world.zoom }; }
 
-Object.assign(globalThis, { clamp, rand, dist2, cvs, ctx, mini, mctx, DPR, world, screenToWorld, worldToScreen });
+let paused = true;
+let muted = false;
+let fogEnabled = true;
+function setPaused(v) { paused = v; }
+function setMuted(v) { muted = v; }
+function setFogEnabled(v) { fogEnabled = v; }
 
 /* ==== Audio (простые огибающие без внешних файлов) ==== */
 const AC = window.AudioContext ? new AudioContext() : null;
 function beep(freq = 440, dur = 0.08, type = 'triangle', gain = 0.06) {
-  if (globalThis.muted || !AC) return;
+  if (muted || !AC) return;
   const o = AC.createOscillator(), g = AC.createGain();
   o.type = type; o.frequency.value = freq; o.connect(g); g.connect(AC.destination); g.gain.value = gain;
   o.start(); g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + dur); o.stop(AC.currentTime + dur);
 }
-globalThis.beep = beep;
 
       /* ==== Entities ==== */
       let nextId = 1, simTime = 0;
@@ -202,7 +213,7 @@ globalThis.beep = beep;
       const input = { x: 0, y: 0, wx: 0, wy: 0, keys: {}, buildMode: null, lastClickT: 0, lastClickType: null };
       cvs.addEventListener('mousemove', e => { input.x = e.offsetX; input.y = e.offsetY; const w = screenToWorld(input.x, input.y); input.wx = w.x; input.wy = w.y; });
       cvs.addEventListener('contextmenu', e => { e.preventDefault(); if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; } });
-      window.addEventListener('keydown', e => { const k = e.key.toLowerCase(); input.keys[k] = true; if (k === 'f') globalThis.fogEnabled = !globalThis.fogEnabled; if (k === '1') tryCast(1); if (k === '2') tryCast(2); if (k === '3') tryCast(3); if (k === 'u') { const h = players[0].hero; if (h && h.inventory.length) { const it = h.inventory.shift(); applyItem(h, it); renderInventory(h); } } if (k === 'r') { resumeWorkers(players[0]); } });
+      window.addEventListener('keydown', e => { const k = e.key.toLowerCase(); input.keys[k] = true; if (k === 'f') setFogEnabled(!fogEnabled); if (k === '1') tryCast(1); if (k === '2') tryCast(2); if (k === '3') tryCast(3); if (k === 'u') { const h = players[0].hero; if (h && h.inventory.length) { const it = h.inventory.shift(); applyItem(h, it); renderInventory(h); } } if (k === 'r') { resumeWorkers(players[0]); } });
       window.addEventListener('keyup', e => { input.keys[e.key.toLowerCase()] = false; });
 
       function entityAt(wx, wy) {
@@ -277,7 +288,6 @@ globalThis.beep = beep;
       function allStructures() { return players[0].structures.concat(players[1].structures, players[2].structures); }
       function nearestNode(type, P) { const arr = (type === 'rice' ? riceNodes : waterNodes); let best = null, bd = 1e9; for (const n of arr) { const d = dist2(P.structures[0].x, P.structures[0].y, n.x, n.y); if (d < bd) { bd = d; best = n; } } return best; }
       function lootFromTier(t) { const base = ['scroll_hp', 'scroll_dps']; const rare = ['ring_atk', 'boots', 'amulet', 'orb']; return (Math.random() < 0.6 ? base[Math.random() < 0.5 ? 0 : 1] : rare[(Math.random() * rare.length) | 0]); }
-Object.assign(globalThis, { players, neutral, drops, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes, placeGhost, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel, updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, input });
 
       await import("./ui.js");
 await import("./terrain.js");
@@ -305,7 +315,6 @@ await import("./ai.js");
         world.camX = players[0].structures[0].x - 400; world.camY = players[0].structures[0].y - 300;
       }
       resetGame();
-globalThis.resetGame = resetGame;
 
       /* ==== Loot & pickup ==== */
       function tryPickup() { for (const p of players) { const h = p.hero; if (h && !h.dead) { for (const d of drops) { if (!d.dead && Math.sqrt(dist2(d.x, d.y, h.x, h.y)) < 28) { if (h.inventory.length < 6) { h.inventory.push(d.kind); d.dead = true; if (p === players[0]) renderInventory(h); } } } } } }
@@ -316,7 +325,7 @@ globalThis.resetGame = resetGame;
       function loop(t) {
         const dt = Math.min(0.033, (t - last) / 1000); last = t; simTime += dt;
         clearVisible(); for (const s of players[0].structures) revealCircle(s.x, s.y, 520); for (const u of players[0].units) revealCircle(u.x, u.y, 480);
-        if (!globalThis.paused) {
+        if (!paused) {
           const sp = 900 / world.zoom; if (input.keys['w'] || input.keys['ц']) world.camY -= sp * dt; if (input.keys['s'] || input.keys['ы']) world.camY += sp * dt; if (input.keys['a'] || input.keys['ф']) world.camX -= sp * dt; if (input.keys['d'] || input.keys['в']) world.camX += sp * dt;
           for (const p of players) { for (const s of p.structures) s.update(dt); for (const u of p.units) u.update(dt); if (p.ai) aiThink(dt, players.indexOf(p)); }
           for (const n of neutral.units) { n.update(dt); if (n.dead && !n.awarded) { if (n.lastHitBy != null && n.lastHitBy >= 0) { heroGainFromNeutral(n.lastHitBy, n.tier); if (Math.random() < 0.5) { drops.push(new ItemDrop(n.x + rand(-10, 10), n.y + rand(-10, 10), lootFromTier(n.tier))); } } n.awarded = true; } }
@@ -354,4 +363,12 @@ globalThis.resetGame = resetGame;
       });
 
       function startBuild(kind) { input.buildMode = kind; document.getElementById('buildTip').style.display = 'block'; }
-globalThis.startBuild = startBuild;
+
+export {
+  clamp, rand, dist2, cvs, ctx, mini, mctx, DPR, world, screenToWorld, worldToScreen,
+  paused, muted, fogEnabled, setPaused, setMuted, setFogEnabled,
+  beep, players, neutral, drops, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes,
+  placeGhost, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel,
+  updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, input,
+  resetGame, startBuild
+};
