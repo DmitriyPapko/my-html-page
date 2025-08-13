@@ -29,7 +29,7 @@ globalThis.beep = beep;
       let nextId = 1, simTime = 0;
       class Entity { constructor(x, y, owner = -1) { this.id = nextId++; this.x = x; this.y = y; this.owner = owner; this.hp = 100; this.maxHp = 100; this.dead = false; this.selected = false; this.radius = 16; this.lastHitBy = null; this.regen = 0; this.shield = 0; } damage(n, killerOwner = null) { if (n <= 0) return; const take = Math.min(this.shield, n); this.shield -= take; n -= take; if (n > 0) { this.hp -= n; if (killerOwner != null) this.lastHitBy = killerOwner; if (this.hp <= 0) { this.hp = 0; this.dead = true; this.onDeath && this.onDeath(this.lastHitBy); } } } }
       class Unit extends Entity {
-        constructor(x, y, owner, type = 'worker') { super(x, y, owner); this.type = type; this.radius = 12; this.speed = 190; this.baseSpeed = 190; this.destX = x; this.destY = y; this.attackRange = 28; this.attackCd = 0; this.dps = 22; this.vision = 480; this.isHero = false; this.mp = 0; this.maxMp = 0; this.cd1 = 0; this.cd2 = 0; this.cd3 = 0; this.cdM1 = 8; this.cdM2 = 12; this.cdM3 = 20; this.heroClass = null; this.levelStacks = 0; this.inventory = []; this.targetId = null; this.role = null; this.state = 'idle'; this.workTimer = 0; this.carry = 0; this.speedBuff = 0; this.slow = 0; this.summonTimer = 0; this.retreat = false; this.regen = 0.25; }
+        constructor(x, y, owner, type = 'worker') { super(x, y, owner); this.type = type; this.radius = 12; this.speed = 190; this.baseSpeed = 190; this.destX = x; this.destY = y; this.attackRange = 28; this.attackCd = 0; this.dps = 22; this.vision = 480; this.isHero = false; this.mp = 0; this.maxMp = 0; this.cd1 = 0; this.cd2 = 0; this.cd3 = 0; this.cdM1 = 8; this.cdM2 = 12; this.cdM3 = 20; this.heroClass = null; this.levelStacks = 0; this.inventory = []; this.targetId = null; this.role = null; this.state = 'idle'; this.workTimer = 0; this.carry = 0; this.speedBuff = 0; this.slow = 0; this.summonTimer = 0; this.retreat = false; this.regen = 0.25; this.fireAura = 0; }
         setDest(x, y) { this.destX = x; this.destY = y; this.state = 'move'; this.targetId = null; }
         setTarget(e) { this.targetId = e ? e.id : null; this.state = e ? 'fight' : 'move'; }
         thinkWorker(dt) {
@@ -49,6 +49,16 @@ globalThis.beep = beep;
           if (this.speedBuff > 0) { this.speedBuff = Math.max(0, this.speedBuff - dt); }
           if (this.slow > 0) { this.slow = Math.max(0, this.slow - dt); }
           if (this.summonTimer > 0) { this.summonTimer -= dt; if (this.summonTimer <= 0) { this.dead = true; } }
+          if (this.fireAura > 0) {
+            this.fireAura = Math.max(0, this.fireAura - dt);
+            const enemies = enemiesFor(this.owner);
+            for (const e of enemies) {
+              if (e.dead) continue;
+              if (Math.hypot(e.x - this.x, e.y - this.y) <= 80) {
+                e.damage(20 * dt, this.owner);
+              }
+            }
+          }
           if (this.type === 'worker' && !this.isHero) { this.thinkWorker(dt); return; }
           // retreat logic for AI units
           if (this.owner !== 0 && !this.isHero) {
@@ -73,6 +83,7 @@ globalThis.beep = beep;
           const s = worldToScreen(this.x, this.y);
           let col = '#6bb0ff'; if (this.owner === 1) col = '#e05dff'; if (this.owner === 2) col = '#ffd27a'; if (this.owner === -1) col = '#9fb2a1';
           ctx.fillStyle = col; ctx.beginPath(); ctx.arc(s.x, s.y, 10 * world.zoom, 0, 6.283); ctx.fill();
+          if (this.fireAura > 0) { ctx.strokeStyle = 'rgba(255,120,0,0.5)'; ctx.beginPath(); ctx.arc(s.x, s.y, 80 * world.zoom, 0, 6.283); ctx.stroke(); }
           drawHp(s.x, s.y - 18 * world.zoom, this.hp / this.maxHp);
           if (this.isHero) { ctx.strokeStyle = '#ffd27a'; ctx.beginPath(); ctx.arc(s.x, s.y, 14 * world.zoom, 0, 6.283); ctx.stroke(); }
           if (this.selected) { ctx.strokeStyle = '#7ac8ff'; ctx.beginPath(); ctx.arc(s.x, s.y, 16 * world.zoom, 0, 6.283); ctx.stroke(); }
@@ -86,8 +97,66 @@ globalThis.beep = beep;
         }
         draw() { if (this.owner !== 0 && !isVisible(this.x, this.y)) return; const s = worldToScreen(this.x, this.y); ctx.fillStyle = this.kind === 'hq' ? '#6f8' : this.kind === 'barracks' ? '#f86' : this.kind === 'range' ? '#cfa' : this.kind === 'mBarracks' ? '#9bf' : '#acf'; const w = 84 * world.zoom; ctx.fillRect(s.x - w / 2, s.y - w / 2, w, w); drawHp(s.x, s.y - w / 2 - 10, this.hp / this.maxHp); if (this.selected) { ctx.strokeStyle = '#7ac8ff'; ctx.strokeRect(s.x - w / 2 - 4, s.y - w / 2 - 4, w + 8, w + 8); } }
       }
-      class ResourceNode { constructor(x, y, type = 'rice') { this.id = nextId++; this.x = x; this.y = y; this.type = type; this.radius = 44; } draw() { if (!isExplored(this.x, this.y)) return; const s = worldToScreen(this.x, this.y); const r = this.radius * world.zoom; if (this.type === 'rice') { ctx.fillStyle = '#2a4e2a'; ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, 6.283); ctx.fill(); } else { ctx.fillStyle = '#1a4e6e'; ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, 6.283); ctx.fill(); } } }
-      class ItemDrop extends Entity { constructor(x, y, kind = 'scroll_dps') { super(x, y, -1); this.kind = kind; this.radius = 14; } draw() { if (!isExplored(this.x, this.y)) return; const s = worldToScreen(this.x, this.y); const map = { scroll_hp: 'HP', scroll_dps: 'DPS', ring_atk: 'Ring', boots: 'Boots', amulet: 'Amul', orb: 'Orb' }; ctx.fillStyle = (this.kind === 'scroll_hp') ? '#7cff97' : (this.kind === 'scroll_dps' ? '#ffd27a' : '#8ad'); ctx.beginPath(); ctx.arc(s.x, s.y - 10, 10 * world.zoom, 0, 6.283); ctx.fill(); ctx.fillStyle = '#000'; ctx.font = `${12 * world.zoom}px system-ui`; ctx.fillText(map[this.kind] || this.kind, s.x - 16 * world.zoom, s.y + 14 * world.zoom); } }
+      class ResourceNode {
+        constructor(x, y, type = 'rice') {
+          this.id = nextId++;
+          this.x = x;
+          this.y = y;
+          this.type = type;
+          this.radius = 44;
+          this.waveOff = Math.random() * 6.283;
+        }
+        draw() {
+          if (!isExplored(this.x, this.y)) return;
+          const s = worldToScreen(this.x, this.y);
+          const r = this.radius * world.zoom;
+          let grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r);
+          if (this.type === 'rice') {
+            grad.addColorStop(0, '#64a346');
+            grad.addColorStop(1, '#2a4e2a');
+          } else {
+            grad.addColorStop(0, '#6ec5ff');
+            grad.addColorStop(1, '#1a4e6e');
+          }
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, r, 0, 6.283);
+          ctx.fill();
+          ctx.lineWidth = 2 * world.zoom;
+          ctx.strokeStyle = this.type === 'rice' ? '#b0c97a' : '#9fd5ff';
+          ctx.stroke();
+          if (this.type === 'water') {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+            for (let i = 0; i < 3; i++) {
+              const rr = (simTime * 40 + this.waveOff + i * 25) % r;
+              ctx.beginPath();
+              ctx.arc(s.x, s.y, rr, 0, 6.283);
+              ctx.stroke();
+            }
+            ctx.restore();
+          }
+        }
+      }
+      class ItemDrop extends Entity {
+        constructor(x, y, kind = 'scroll_dps') {
+          super(x, y, -1);
+          this.kind = kind;
+          this.radius = 14;
+        }
+        draw() {
+          if (!isExplored(this.x, this.y)) return;
+          const s = worldToScreen(this.x, this.y);
+          const map = { scroll_hp: 'HP', scroll_dps: 'DPS', scroll_fire: 'Fire', ring_atk: 'Ring', boots: 'Boots', amulet: 'Amul', orb: 'Orb' };
+          ctx.fillStyle = this.kind === 'scroll_hp' ? '#7cff97' : (this.kind.startsWith('scroll') ? '#ffd27a' : '#8ad');
+          ctx.beginPath();
+          ctx.arc(s.x, s.y - 10, 10 * world.zoom, 0, 6.283);
+          ctx.fill();
+          ctx.fillStyle = '#000';
+          ctx.font = `${12 * world.zoom}px system-ui`;
+          ctx.fillText(map[this.kind] || this.kind, s.x - 16 * world.zoom, s.y + 14 * world.zoom);
+        }
+      }
 
       /* ==== Neutrals ==== */
       class NeutralCreep extends Entity {
@@ -165,44 +234,71 @@ globalThis.beep = beep;
         for (let i = 0; i < cap; i++) {
           const slot = document.createElement('div'); slot.className = 'invSlot';
           if (arr[i]) {
-            const it = arr[i]; const names = { scroll_hp: 'Свиток HP', scroll_dps: 'Свиток DPS', ring_atk: 'Кольцо атаки', boots: 'Сапоги', amulet: 'Амулет', orb: 'Орб маны' };
+            const it = arr[i];
+            const names = { scroll_hp: 'Свиток HP', scroll_dps: 'Свиток DPS', scroll_fire: 'Свиток огня', ring_atk: 'Кольцо атаки', boots: 'Сапоги', amulet: 'Амулет', orb: 'Орб маны' };
             slot.textContent = names[it] || it;
-            slot.title = 'ЛКМ/ПКМ — использовать';
-            slot.onclick = (e) => { applyItem(hero, it); hero.inventory.splice(i, 1); renderInventory(hero); };
-            slot.oncontextmenu = (e) => { e.preventDefault(); applyItem(hero, it); hero.inventory.splice(i, 1); renderInventory(hero); };
+            const isScroll = it.startsWith('scroll');
+            slot.title = isScroll ? 'ЛКМ/ПКМ — использовать' : 'Пассивный эффект';
+            if (isScroll) {
+              slot.onclick = (e) => { applyItem(hero, it); hero.inventory.splice(i, 1); renderInventory(hero); };
+              slot.oncontextmenu = (e) => { e.preventDefault(); applyItem(hero, it); hero.inventory.splice(i, 1); renderInventory(hero); };
+            }
           }
           invGrid.appendChild(slot);
         }
       }
-      function applyItem(hero, itemKind) { if (itemKind === 'scroll_hp') { hero.maxHp += 80; hero.hp = Math.min(hero.maxHp, hero.hp + 120); } if (itemKind === 'scroll_dps') { hero.dps = (hero.dps || 40) + 10; } if (itemKind === 'ring_atk') { hero.dps += 6; } if (itemKind === 'boots') { hero.baseSpeed += 20; hero.speed += 20; } if (itemKind === 'amulet') { hero.maxHp += 120; hero.hp += 120; } if (itemKind === 'orb') { hero.maxMp += 60; hero.mp += 60; } if (hero.owner === 0) setHeroUI(hero); }
-      function tryCast(slot) {
-        const h = players[0].hero; if (!h || h.dead) return;
-        if (slot === 1 && h.cd1 <= 0) {
-          if (h.heroClass === 'paladin') { if (h.mp < 40) return; h.mp -= 40; const R = 180; for (const u of players[0].units) { if (u.dead) continue; if (Math.hypot(u.x - h.x, u.y - h.y) <= R) { u.hp = Math.min(u.maxHp, u.hp + 90); } } beep(660, 0.08, 'triangle', 0.05); }
-          else if (h.heroClass === 'rogue') { if (h.mp < 25) return; h.mp -= 25; h.speedBuff = 2.5; beep(880, 0.06, 'square', 0.05); }
-          else { if (h.mp < 35) return; h.mp -= 35; const p = screenToWorld(input.x, input.y); const R = 120; for (const u of players[1].units.concat(players[2].units, neutral.units)) { if (u.dead) continue; if (Math.hypot(u.x - p.x, u.y - p.y) <= R) { u.damage(80, 0); } } beep(520, 0.08, 'sawtooth', 0.06); }
-          h.cd1 = h.cdM1; if (h.owner === 0) setHeroUI(h);
+      function applyItem(hero, itemKind) {
+        if (itemKind === 'scroll_hp') { hero.maxHp += 80; hero.hp = Math.min(hero.maxHp, hero.hp + 120); }
+        if (itemKind === 'scroll_dps') { hero.dps = (hero.dps || 40) + 10; }
+        if (itemKind === 'scroll_fire') { hero.fireAura = 6; }
+        if (itemKind === 'ring_atk') { hero.dps += 6; }
+        if (itemKind === 'boots') { hero.baseSpeed += 20; hero.speed += 20; }
+        if (itemKind === 'amulet') { hero.maxHp += 120; hero.hp += 120; }
+        if (itemKind === 'orb') { hero.maxMp += 60; hero.mp += 60; }
+        if (hero.owner === 0) setHeroUI(hero);
+      }
+      function castAbility(hero, slot, tx, ty) {
+        if (!hero || hero.dead) return;
+        if (slot === 1 && hero.cd1 <= 0) {
+          if (hero.heroClass === 'paladin') {
+            if (hero.mp < 40) return; hero.mp -= 40; const R = 180; for (const u of players[hero.owner].units) { if (u.dead) continue; if (Math.hypot(u.x - hero.x, u.y - hero.y) <= R) { u.hp = Math.min(u.maxHp, u.hp + 90); } } beep(660, 0.08, 'triangle', 0.05);
+          } else if (hero.heroClass === 'rogue') {
+            if (hero.mp < 25) return; hero.mp -= 25; hero.speedBuff = 2.5; beep(880, 0.06, 'square', 0.05);
+          } else {
+            if (hero.mp < 35) return; hero.mp -= 35; const R = 120; const enemies = enemiesFor(hero.owner); for (const u of enemies) { if (u.dead) continue; if (Math.hypot(u.x - tx, u.y - ty) <= R) { u.damage(80, hero.owner); } } beep(520, 0.08, 'sawtooth', 0.06);
+          }
+          hero.cd1 = hero.cdM1; if (hero.owner === 0) setHeroUI(hero);
         }
-        if (slot === 2 && h.cd2 <= 0) {
-          if (h.heroClass === 'paladin') { if (h.mp < 35) return; h.mp -= 35; h.shield = (h.shield || 0) + 120; beep(280, 0.08, 'triangle', 0.05); }
-          else if (h.heroClass === 'rogue') { if (h.mp < 40) return; h.mp -= 40; const R = 180; for (const e of players[1].units.concat(players[2].units, neutral.units)) { if (e.dead) continue; if (Math.hypot(e.x - h.x, e.y - h.y) <= R) { e.damage(70, 0); } } beep(720, 0.08, 'square', 0.06); }
-          else { if (h.mp < 60) return; h.mp -= 60; const e = new Unit(h.x + 24, h.y, h.owner, 'elemental'); e.dps = 18; e.maxHp = 200; e.hp = 200; e.attackRange = 210; e.summonTimer = 20; players[h.owner].units.push(e); beep(480, 0.09, 'sawtooth', 0.06); }
-          h.cd2 = h.cdM2; if (h.owner === 0) setHeroUI(h);
+        if (slot === 2 && hero.cd2 <= 0) {
+          if (hero.heroClass === 'paladin') {
+            if (hero.mp < 35) return; hero.mp -= 35; hero.shield = (hero.shield || 0) + 120; beep(280, 0.08, 'triangle', 0.05);
+          } else if (hero.heroClass === 'rogue') {
+            if (hero.mp < 40) return; hero.mp -= 40; const R = 180; const enemies = enemiesFor(hero.owner); for (const e of enemies) { if (e.dead) continue; if (Math.hypot(e.x - hero.x, e.y - hero.y) <= R) { e.damage(70, hero.owner); } } beep(720, 0.08, 'square', 0.06);
+          } else {
+            if (hero.mp < 60) return; hero.mp -= 60; const e = new Unit(hero.x + 24, hero.y, hero.owner, 'elemental'); e.dps = 18; e.maxHp = 200; e.hp = 200; e.attackRange = 210; e.summonTimer = 20; players[hero.owner].units.push(e); beep(480, 0.09, 'sawtooth', 0.06);
+          }
+          hero.cd2 = hero.cdM2; if (hero.owner === 0) setHeroUI(hero);
         }
-        if (slot === 3 && h.cd3 <= 0) {
-          if (h.heroClass === 'paladin') { if (h.mp < 45) return; h.mp -= 45; const R = 200; for (const u of players[0].units) { if (Math.hypot(u.x - h.x, u.y - h.y) <= R) u.hp = Math.min(u.maxHp, u.hp + 70); } for (const e of players[1].units.concat(players[2].units, neutral.units)) { if (Math.hypot(e.x - h.x, e.y - h.y) <= R) e.damage(60, 0); } beep(560, 0.09, 'triangle', 0.06); }
-          else if (h.heroClass === 'rogue') { if (h.mp < 55) return; h.mp -= 55; const R = 220; for (const e of players[1].units.concat(players[2].units, neutral.units)) { if (Math.hypot(e.x - h.x, e.y - h.y) <= R) { e.damage(50, 0); e.slow = 3.5; } } beep(900, 0.07, 'square', 0.06); }
-          else { if (h.mp < 90) return; h.mp -= 90; const d = new Unit(h.x + 28, h.y + 12, h.owner, 'demon'); d.dps = 36; d.maxHp = 500; d.hp = 500; d.attackRange = 60; d.summonTimer = 25; players[h.owner].units.push(d); beep(360, 0.12, 'sawtooth', 0.07); }
-          h.cd3 = h.cdM3; if (h.owner === 0) setHeroUI(h);
+        if (slot === 3 && hero.cd3 <= 0) {
+          if (hero.heroClass === 'paladin') {
+            if (hero.mp < 45) return; hero.mp -= 45; const R = 200; for (const u of players[hero.owner].units) { if (Math.hypot(u.x - hero.x, u.y - hero.y) <= R) u.hp = Math.min(u.maxHp, u.hp + 70); } const enemies = enemiesFor(hero.owner); for (const e of enemies) { if (Math.hypot(e.x - hero.x, e.y - hero.y) <= R) e.damage(60, hero.owner); } beep(560, 0.09, 'triangle', 0.06);
+          } else if (hero.heroClass === 'rogue') {
+            if (hero.mp < 55) return; hero.mp -= 55; const R = 220; const enemies = enemiesFor(hero.owner); for (const e of enemies) { if (Math.hypot(e.x - hero.x, e.y - hero.y) <= R) { e.damage(50, hero.owner); e.slow = 3.5; } } beep(900, 0.07, 'square', 0.06);
+          } else {
+            if (hero.mp < 90) return; hero.mp -= 90; const d = new Unit(hero.x + 28, hero.y + 12, hero.owner, 'demon'); d.dps = 36; d.maxHp = 500; d.hp = 500; d.attackRange = 60; d.summonTimer = 25; players[hero.owner].units.push(d); beep(360, 0.12, 'sawtooth', 0.07);
+          }
+          hero.cd3 = hero.cdM3; if (hero.owner === 0) setHeroUI(hero);
         }
       }
+      function tryCast(slot) {
+        const h = players[0].hero; if (!h || h.dead) return; const p = screenToWorld(input.x, input.y); castAbility(h, slot, p.x, p.y); }
 
       /* ==== Input & selection ==== */
       const buildTip = document.getElementById('buildTip');
       const input = { x: 0, y: 0, wx: 0, wy: 0, keys: {}, buildMode: null, lastClickT: 0, lastClickType: null };
       cvs.addEventListener('mousemove', e => { input.x = e.offsetX; input.y = e.offsetY; const w = screenToWorld(input.x, input.y); input.wx = w.x; input.wy = w.y; });
       cvs.addEventListener('contextmenu', e => { e.preventDefault(); if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; } });
-      window.addEventListener('keydown', e => { const k = e.key.toLowerCase(); input.keys[k] = true; if (k === 'f') globalThis.fogEnabled = !globalThis.fogEnabled; if (k === '1') tryCast(1); if (k === '2') tryCast(2); if (k === '3') tryCast(3); if (k === 'u') { const h = players[0].hero; if (h && h.inventory.length) { const it = h.inventory.shift(); applyItem(h, it); renderInventory(h); } } if (k === 'r') { resumeWorkers(players[0]); } });
+      window.addEventListener('keydown', e => { const k = e.key.toLowerCase(); input.keys[k] = true; if (k === 'f') globalThis.fogEnabled = !globalThis.fogEnabled; if (k === '1') tryCast(1); if (k === '2') tryCast(2); if (k === '3') tryCast(3); if (k === 'u') { const h = players[0].hero; if (h) { const idx = h.inventory.findIndex(it => it.startsWith('scroll')); if (idx >= 0) { const it = h.inventory[idx]; applyItem(h, it); h.inventory.splice(idx, 1); renderInventory(h); } } } if (k === 'r') { resumeWorkers(players[0]); } });
       window.addEventListener('keyup', e => { input.keys[e.key.toLowerCase()] = false; });
 
       function entityAt(wx, wy) {
@@ -276,8 +372,12 @@ globalThis.beep = beep;
       function allUnits() { return players[0].units.concat(players[1].units, players[2].units); }
       function allStructures() { return players[0].structures.concat(players[1].structures, players[2].structures); }
       function nearestNode(type, P) { const arr = (type === 'rice' ? riceNodes : waterNodes); let best = null, bd = 1e9; for (const n of arr) { const d = dist2(P.structures[0].x, P.structures[0].y, n.x, n.y); if (d < bd) { bd = d; best = n; } } return best; }
-      function lootFromTier(t) { const base = ['scroll_hp', 'scroll_dps']; const rare = ['ring_atk', 'boots', 'amulet', 'orb']; return (Math.random() < 0.6 ? base[Math.random() < 0.5 ? 0 : 1] : rare[(Math.random() * rare.length) | 0]); }
-Object.assign(globalThis, { players, neutral, drops, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes, placeGhost, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel, updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, input });
+      function lootFromTier(t) {
+        const base = ['scroll_hp', 'scroll_dps', 'scroll_fire'];
+        const rare = ['ring_atk', 'boots', 'amulet', 'orb'];
+        return (Math.random() < 0.6 ? base[(Math.random() * base.length) | 0] : rare[(Math.random() * rare.length) | 0]);
+      }
+Object.assign(globalThis, { players, neutral, drops, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes, placeGhost, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel, updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, input, applyItem, renderInventory, castAbility });
 
       await import("./ui.js");
 await import("./terrain.js");
@@ -308,7 +408,23 @@ await import("./ai.js");
 globalThis.resetGame = resetGame;
 
       /* ==== Loot & pickup ==== */
-      function tryPickup() { for (const p of players) { const h = p.hero; if (h && !h.dead) { for (const d of drops) { if (!d.dead && Math.sqrt(dist2(d.x, d.y, h.x, h.y)) < 28) { if (h.inventory.length < 6) { h.inventory.push(d.kind); d.dead = true; if (p === players[0]) renderInventory(h); } } } } } }
+      function tryPickup() {
+        for (const p of players) {
+          const h = p.hero;
+          if (h && !h.dead) {
+            for (const d of drops) {
+              if (!d.dead && Math.sqrt(dist2(d.x, d.y, h.x, h.y)) < 28) {
+                if (h.inventory.length < 6) {
+                  h.inventory.push(d.kind);
+                  if (!d.kind.startsWith('scroll')) applyItem(h, d.kind);
+                  d.dead = true;
+                  if (p === players[0]) renderInventory(h);
+                }
+              }
+            }
+          }
+        }
+      }
 
       /* ==== Loop ==== */
       let last = performance.now();

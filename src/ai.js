@@ -5,6 +5,19 @@ function aiInitPlan(P) {
   else if (cls === 'rogue') { P.aiPlan = { comp: { soldier: 0.4, archer: 0.6, mage: 0.0 }, open: ['well', 'range', 'barracks'], state: 'farm', pushAt: 8, nextBuild: 0 }; }
   else { P.aiPlan = { comp: { soldier: 0.2, archer: 0.4, mage: 0.4 }, open: ['well', 'mBarracks', 'range'], state: 'farm', pushAt: 12, nextBuild: 0 }; }
 }
+function aiUseHero(hero, target) {
+  const applyItem = globalThis.applyItem;
+  const castAbility = globalThis.castAbility;
+  if (!hero || hero.dead || !target) return;
+  const d = Math.hypot(hero.x - target.x, hero.y - target.y);
+  if (d < 260) {
+    const idx = hero.inventory.findIndex(it => it.startsWith('scroll'));
+    if (idx >= 0) { const it = hero.inventory[idx]; applyItem(hero, it); hero.inventory.splice(idx, 1); }
+    castAbility(hero, 1, target.x, target.y);
+    castAbility(hero, 2, target.x, target.y);
+    castAbility(hero, 3, target.x, target.y);
+  }
+}
 function aiThink(dt, id) {
   const players = globalThis.players;
   const COSTS = globalThis.COSTS;
@@ -38,13 +51,19 @@ function aiThink(dt, id) {
     else if (rng && r < P.aiPlan.comp.soldier + P.aiPlan.comp.archer) rng.queue.push('archer');
     else if (mb) mb.queue.push('mage');
   }
-  // hero farms nearest neutral
-  const neutral = globalThis.neutral;
-  const hero = P.hero; if (hero && !hero.dead) { const tgt = nearestNeutralCamp(P); if (tgt) { hero.setTarget(tgt); } }
-  // army rally / attack
-  if (P.units.filter(u => u.type !== 'worker' && !u.isHero).length >= P.aiPlan.pushAt) {
+  const hero = P.hero;
+  if (hero && !hero.dead) {
     const enemyHero = players[0].hero && !players[0].hero.dead ? players[0].hero : null;
-    const tgt = enemyHero || players[0].structures.find(s => !s.isGhost) || players[0].units.find(u => !u.isHero);
+    const neutral = nearestNeutralCamp(P);
+    const tgt = enemyHero || neutral;
+    if (tgt) { hero.setTarget(tgt); aiUseHero(hero, tgt); }
+  }
+  // army rally / attack
+  const myArmy = P.units.filter(u => u.type !== 'worker' && !u.dead).length;
+  const enemyArmy = players[0].units.filter(u => u.type !== 'worker' && !u.dead).length;
+  if (myArmy > enemyArmy + 2 || myArmy >= P.aiPlan.pushAt) {
+    const enemyHero = players[0].hero && !players[0].hero.dead ? players[0].hero : null;
+    const tgt = enemyHero || players[0].structures.find(s => !s.isGhost) || players[0].units.find(u => !u.isHero && !u.dead);
     if (tgt) { P.units.filter(u => u.type !== 'worker').forEach(u => { if (!u.retreat) u.setTarget(tgt); }); }
   }
 }
