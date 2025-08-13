@@ -4,8 +4,8 @@ const blockers = []; // {x,y,r,kind}
 function genBlockers() {
   const { rand, clamp, world } = globalThis;
   blockers.length = 0;
-  for (let i = 0; i < 4; i++) {
-    const x = 2000 + i * 2500 + rand(-400, 400);
+  for (let i = 0; i < 2; i++) {
+    const x = 2400 + i * 3500 + rand(-400, 400);
     for (let y = 600; y < world.height - 600; y += 180) {
       blockers.push({ x: x + rand(-60, 60), y: y, r: 38, kind: 'water' });
     }

@@ -15,8 +15,23 @@ function resize() { const w = cvs.clientWidth, h = cvs.clientHeight; cvs.width =
 new ResizeObserver(resize).observe(cvs); resize();
 function screenToWorld(sx, sy) { return { x: sx / world.zoom + world.camX, y: sy / world.zoom + world.camY }; }
 function worldToScreen(wx, wy) { return { x: (wx - world.camX) * world.zoom, y: (wy - world.camY) * world.zoom }; }
+function clampCam() {
+  const vw = cvs.width / DPR / world.zoom, vh = cvs.height / DPR / world.zoom;
+  world.camX = clamp(world.camX, 0, world.width - vw);
+  world.camY = clamp(world.camY, 0, world.height - vh);
+}
+cvs.addEventListener('wheel', e => {
+  e.preventDefault();
+  const wx = e.offsetX / world.zoom + world.camX;
+  const wy = e.offsetY / world.zoom + world.camY;
+  const nz = clamp(world.zoom * (e.deltaY < 0 ? 1.1 : 0.9), 0.6, 2.8);
+  world.camX = wx - e.offsetX / nz;
+  world.camY = wy - e.offsetY / nz;
+  world.zoom = nz;
+  clampCam();
+}, { passive: false });
 
-Object.assign(globalThis, { clamp, rand, dist2, cvs, ctx, mini, mctx, DPR, world, screenToWorld, worldToScreen });
+Object.assign(globalThis, { clamp, rand, dist2, cvs, ctx, mini, mctx, DPR, world, screenToWorld, worldToScreen, clampCam });
 
 /* ==== Audio (простые огибающие без внешних файлов) ==== */
 const AC = window.AudioContext ? new AudioContext() : null;
@@ -28,6 +43,34 @@ function beep(freq = 440, dur = 0.08, type = 'triangle', gain = 0.06) {
 }
 globalThis.beep = beep;
 let simTime = 0;
+let gameOver = false;
+const weather = { type: 'sun', particles: [] };
+function setWeather(t) {
+  weather.type = t;
+  weather.particles.length = 0;
+  if (t === 'rain') {
+    for (let i = 0; i < 120; i++) weather.particles.push({ x: Math.random() * world.width, y: Math.random() * world.height });
+  }
+}
+function drawWeather(dt) {
+  if (weather.type === 'evening') {
+    ctx.fillStyle = 'rgba(255,180,100,0.08)';
+    ctx.fillRect(0, 0, cvs.width, cvs.height);
+  } else if (weather.type === 'rain') {
+    ctx.fillStyle = 'rgba(120,120,120,0.12)';
+    ctx.fillRect(0, 0, cvs.width, cvs.height);
+    ctx.strokeStyle = 'rgba(180,180,255,0.5)';
+    ctx.beginPath();
+    for (const p of weather.particles) {
+      const s = worldToScreen(p.x, p.y);
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(s.x - 2 * world.zoom, s.y + 8 * world.zoom);
+      p.x -= 50 * dt; p.y += 200 * dt;
+      if (p.y > world.height) { p.y = 0; p.x = Math.random() * world.width; }
+    }
+    ctx.stroke();
+  }
+}
       const neutral = { units: [] }, drops = [], projectiles = [];
 
       /* ==== Players & economy ==== */
@@ -58,8 +101,8 @@ let simTime = 0;
       }
 
       /* ==== Hero & abilities ==== */
-      const abilityBar = document.getElementById('abilityBar'); const abilityDesc = document.getElementById('abilityDesc');
-      const heroName = document.getElementById('heroName'), heroHP = document.getElementById('heroHP'), heroMP = document.getElementById('heroMP'), heroLVL = document.getElementById('heroLVL'); const ab1 = document.getElementById('ab1'), ab2 = document.getElementById('ab2'), ab3 = document.getElementById('ab3'); const invPanel = document.getElementById('invPanel'), invGrid = document.getElementById('invGrid');
+      const heroPanel = document.getElementById('heroPanel'); const abilityDesc = document.getElementById('abilityDesc');
+      const heroName = document.getElementById('heroName'), heroHP = document.getElementById('heroHP'), heroMP = document.getElementById('heroMP'), heroLVL = document.getElementById('heroLVL'), expFill = document.getElementById('expFill'); const ab1 = document.getElementById('ab1'), ab2 = document.getElementById('ab2'), ab3 = document.getElementById('ab3'); const invPanel = document.getElementById('invPanel'), invGrid = document.getElementById('invGrid');
       const abilityInfo = {
         paladin: {
           1: 'Исцеление (40 маны): лечит союзников на 90 HP в радиусе 180.',
@@ -78,12 +121,13 @@ let simTime = 0;
         }
       };
       function setHeroUI(h) {
-        if (!h) { abilityBar.style.display = 'none'; abilityDesc.style.display = 'none'; invPanel.style.display = 'none'; return; }
-        abilityBar.style.display = 'block'; abilityDesc.style.display = 'block'; invPanel.style.display = 'block';
+        if (!h) { heroPanel.style.display = 'none'; invPanel.style.display = 'none'; return; }
+        heroPanel.style.display = 'block'; invPanel.style.display = 'block';
         heroName.textContent = h.heroName + ' (' + h.heroClass + ')';
         heroHP.textContent = `HP ${h.hp | 0}/${h.maxHp | 0}`;
         heroMP.textContent = `MP ${h.mp | 0}/${h.maxMp | 0}`;
-        heroLVL.textContent = 'Lvl ' + h.levelStacks;
+        heroLVL.textContent = 'Lvl ' + h.level;
+        expFill.style.width = (h.exp / h.expToNext * 100) + '%';
         const info = abilityInfo[h.heroClass] || {};
         ab1.title = info[1] || '';
         ab2.title = info[2] || '';
@@ -92,13 +136,13 @@ let simTime = 0;
       }
       ab1.onclick = () => tryCast(1); ab2.onclick = () => tryCast(2); ab3.onclick = () => tryCast(3);
       function spawnHero(owner, x, y, cls = null) {
-        const h = new Unit(x, y, owner, 'soldier'); h.isHero = true; h.maxHp = 420; h.hp = 420; h.maxMp = 160; h.mp = 120; h.dps = 50; h.attackRange = 40; h.vision = 560; h.inventory = []; h.levelStacks = 0; h.regen = 0.83; h.mpRegen = 0.8;
+        const h = new Unit(x, y, owner, 'soldier'); h.isHero = true; h.maxHp = 420; h.hp = 420; h.maxMp = 160; h.mp = 120; h.dps = 50; h.attackRange = 40; h.vision = 560; h.inventory = []; h.level = 1; h.exp = 0; h.expToNext = 100; h.regen = 0.83; h.mpRegen = 0.8;
         if (!cls) { const r = Math.random(); cls = r < 0.34 ? 'paladin' : (r < 0.67 ? 'rogue' : 'archmage'); }
         h.heroClass = cls; players[owner].chosenClass = cls;
         if (cls === 'paladin') { h.heroName = 'Паладин'; h.cdM1 = 8; h.cdM2 = 12; h.cdM3 = 16; }
         if (cls === 'rogue') { h.heroName = 'Разбойник'; h.cdM1 = 10; h.cdM2 = 9; h.cdM3 = 16; }
         if (cls === 'archmage') { h.heroName = 'Аркан‑маг'; h.cdM1 = 7; h.cdM2 = 18; h.cdM3 = 28; }
-        h.onDeath = () => { if (owner === 0) { abilityBar.style.display = 'none'; invPanel.style.display = 'none'; } players[owner].hero = null; };
+        h.onDeath = () => { if (owner === 0) { heroPanel.style.display = 'none'; invPanel.style.display = 'none'; } players[owner].hero = null; };
         players[owner].units.push(h); players[owner].hero = h; return h;
       }
       function chooseHeroClass() {
@@ -113,13 +157,25 @@ let simTime = 0;
           });
         });
       }
+      function heroGainExp(hero, amount) {
+        if (!hero || hero.dead) return;
+        hero.exp += amount;
+        while (hero.exp >= hero.expToNext) {
+          hero.exp -= hero.expToNext;
+          hero.expToNext *= 1.25;
+          hero.level += 1;
+          hero.maxHp *= 1.2; hero.hp = hero.maxHp;
+          hero.dps *= 1.2;
+          hero.baseSpeed *= 1.2; hero.speed = hero.baseSpeed;
+          hero.regen *= 1.2; hero.mpRegen *= 1.2; hero.attackRange *= 1.2;
+        }
+        if (hero.owner === 0) setHeroUI(hero);
+      }
+
       function heroGainFromNeutral(owner, tier) {
         const h = players[owner]?.hero; if (!h || h.dead) return;
-        const hpGain = tier === 1 ? 20 : (tier === 2 ? 35 : 60);
-        const dpsGain = tier === 1 ? 3 : (tier === 2 ? 5 : 8);
-        h.maxHp += hpGain; h.hp = Math.min(h.maxHp, h.hp + hpGain);
-        h.dps += dpsGain; h.levelStacks += 1;
-        if (owner === 0) setHeroUI(h);
+        const gain = tier === 1 ? 30 : (tier === 2 ? 60 : 90);
+        heroGainExp(h, gain);
       }
       function renderInventory(hero) {
         if (!hero || hero.dead) { invPanel.style.display = 'none'; invGrid.innerHTML = ''; return; }
@@ -288,7 +344,7 @@ let simTime = 0;
       }
 
       /* ==== Utils ==== */
-Object.assign(globalThis, { players, neutral, drops, projectiles, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes, placeGhost, trainUnit, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel, updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, getById, enemiesFor, Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, input });
+Object.assign(globalThis, { players, neutral, drops, projectiles, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes, placeGhost, trainUnit, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel, updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, getById, enemiesFor, Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, input, setHeroUI });
 
       await import("./ui.js");
 await import("./terrain.js");
@@ -298,23 +354,39 @@ await import("./ai.js");
 /* ==== Setup/Reset ==== */
       async function resetGame() {
         genBlockers();
+        gameOver = false;
+        const presets = ['sun', 'evening', 'rain'];
+        setWeather(presets[(Math.random() * presets.length) | 0]);
         for (const p of players) { p.units.length = 0; p.structures.length = 0; p.hero = null; p.res.rice = 220; p.res.water = 100; p.aiPlan = null; }
         neutral.units.length = 0; drops.length = 0; riceNodes.length = 0; waterNodes.length = 0; explored.fill(0); visible.fill(0); updateRes();
         const pos = [{ x: 900, y: 900 }, { x: world.width - 1200, y: 1200 }, { x: world.width - 1800, y: world.height - 1400 }];
         const playerClass = await chooseHeroClass();
         for (let i = 0; i < 3; i++) {
           const HQ = new Structure(pos[i].x, pos[i].y, i, 'hq', false); players[i].structures.push(HQ);
-          for (let k = 0; k < 6; k++) { const w = new Unit(HQ.x + (k % 3) * 24, HQ.y + 60 + Math.floor(k / 3) * 24, i, 'worker'); players[i].units.push(w); w.role = (k % 2 === 0) ? 'rice' : 'water'; } // 3/3
+          for (let k = 0; k < 6; k++) { const w = new Unit(HQ.x + (k % 3) * 24, HQ.y + 60 + Math.floor(k / 3) * 24, i, 'worker'); players[i].units.push(w); w.role = (k % 2 === 0) ? 'rice' : 'water'; }
           const cls = (i === 0 ? playerClass : (Math.random() < 0.34 ? 'paladin' : (Math.random() < 0.67 ? 'rogue' : 'archmage')));
           spawnHero(i, HQ.x + 80, HQ.y - 20, cls);
           riceNodes.push(new ResourceNode(HQ.x + 220, HQ.y + 160, 'rice')); waterNodes.push(new ResourceNode(HQ.x - 220, HQ.y + 160, 'water'));
         }
         // neutrals far from starts
         function farFromAll(x, y, dist) { for (const p of players) { const s = p.structures[0]; if (Math.hypot(x - s.x, y - s.y) < dist) return false; } return true; }
-        let placed = 0; while (placed < 28) { const x = 200 + Math.random() * (world.width - 400), y = 200 + Math.random() * (world.height - 400); if (!farFromAll(x, y, 1200)) continue; const tier = Math.random() < 0.6 ? 1 : (Math.random() < 0.7 ? 2 : 3); neutral.units.push(new NeutralCreep(x, y, tier)); placed++; }
+        let camps = 0; while (camps < 8) {
+          const cx = 200 + Math.random() * (world.width - 400), cy = 200 + Math.random() * (world.height - 400);
+          if (!farFromAll(cx, cy, 1200)) continue;
+          const group = { dropsLeft: 1 + (Math.random() < 0.5 ? 0 : 1) };
+          const size = 3 + ((Math.random() * 3) | 0);
+          for (let i = 0; i < size; i++) {
+            const kindArr = ['mage', 'beast', 'gnome', 'troll'];
+            const kind = kindArr[(Math.random() * kindArr.length) | 0];
+            const n = new NeutralCreep(cx + rand(-80, 80), cy + rand(-80, 80), kind);
+            n.group = group;
+            neutral.units.push(n);
+          }
+          camps++;
+        }
         // reveal around player
         revealCircle(players[0].structures[0].x, players[0].structures[0].y, 900);
-        world.camX = players[0].structures[0].x - 400; world.camY = players[0].structures[0].y - 300;
+        world.camX = players[0].structures[0].x - 400; world.camY = players[0].structures[0].y - 300; clampCam();
       }
 globalThis.resetGame = resetGame;
 
@@ -329,22 +401,35 @@ globalThis.drawHp = drawHp;
         const dt = Math.min(0.033, (t - last) / 1000); last = t; simTime += dt;
         clearVisible(); for (const s of players[0].structures) revealCircle(s.x, s.y, 520); for (const u of players[0].units) revealCircle(u.x, u.y, 480);
         if (!globalThis.paused) {
-          const sp = 900 / world.zoom; if (input.keys['w'] || input.keys['ц']) world.camY -= sp * dt; if (input.keys['s'] || input.keys['ы']) world.camY += sp * dt; if (input.keys['a'] || input.keys['ф']) world.camX -= sp * dt; if (input.keys['d'] || input.keys['в']) world.camX += sp * dt;
+          const sp = 900 / world.zoom; if (input.keys['w'] || input.keys['ц']) world.camY -= sp * dt; if (input.keys['s'] || input.keys['ы']) world.camY += sp * dt; if (input.keys['a'] || input.keys['ф']) world.camX -= sp * dt; if (input.keys['d'] || input.keys['в']) world.camX += sp * dt; clampCam();
           for (const p of players) { for (const s of p.structures) s.update(dt); for (const u of p.units) u.update(dt); if (p.ai) aiThink(dt, players.indexOf(p)); }
-          // нейтралы больше не роняют предметы
-          for (const n of neutral.units) { n.update(dt); if (n.dead && !n.awarded) { if (n.lastHitBy != null && n.lastHitBy >= 0) { heroGainFromNeutral(n.lastHitBy, n.tier); } n.awarded = true; } }
-          // cleanup neutrals (remove processed corpses)
+          for (const n of neutral.units) { n.update(dt); if (n.dead && !n.awarded) { if (n.lastHitBy != null && n.lastHitBy >= 0) { heroGainFromNeutral(n.lastHitBy, n.tier); }
+            if (n.group && n.group.dropsLeft > 0) { drops.push(new ItemDrop(n.x, n.y, lootFromTier(n.tier))); n.group.dropsLeft--; }
+            n.awarded = true; } }
           for (let i = neutral.units.length - 1; i >= 0; i--) { if (neutral.units[i].dead && neutral.units[i].awarded) { neutral.units.splice(i, 1); } }
           for (const pr of projectiles) pr.update(dt);
           for (let i = projectiles.length - 1; i >= 0; i--) if (projectiles[i].dead) projectiles.splice(i, 1);
           tryPickup();
-          // cleanup players lists
+          for (let pi = 1; pi < players.length; pi++) {
+            for (const u of players[pi].units) if (u.dead && !u.expGiven) { if (u.lastHitBy === 0) heroGainExp(players[0].hero, 40); u.expGiven = true; }
+            for (const s of players[pi].structures) if (s.dead && !s.expGiven && !s.isGhost) { if (s.lastHitBy === 0) heroGainExp(players[0].hero, 80); s.expGiven = true; }
+          }
           for (const p of [players[0], players[1], players[2]]) { p.units = p.units.filter(u => !u.dead); p.structures = p.structures.filter(s => !s.dead); }
+          if (!gameOver) {
+            const playerAlive = players[0].units.some(u => !u.dead) || players[0].structures.some(s => !s.dead && !s.isGhost);
+            let enemiesAlive = false;
+            for (let pi = 1; pi < players.length; pi++) {
+              if (players[pi].units.some(u => !u.dead) || players[pi].structures.some(s => !s.dead && !s.isGhost)) { enemiesAlive = true; break; }
+            }
+            if (!playerAlive) { showResultMenu('Вы проиграли'); gameOver = true; }
+            else if (!enemiesAlive) { showResultMenu('Победа'); gameOver = true; }
+          }
         }
         ctx.clearRect(0, 0, cvs.width, cvs.height);
         drawTerrain();
         const drawables = allStructures().concat(allUnits(), neutral.units, projectiles, riceNodes, waterNodes, drops); drawables.sort((a, b) => a.y - b.y);
         for (const e of drawables) { if (e.draw) e.draw(); }
+        drawWeather(dt);
         drawFog();
         // cursor
         ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); const c = 8; ctx.moveTo(input.x - c, input.y); ctx.lineTo(input.x + c, input.y); ctx.moveTo(input.x, input.y - c); ctx.lineTo(input.x, input.y + c); ctx.stroke();
