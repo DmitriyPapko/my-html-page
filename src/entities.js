@@ -69,7 +69,7 @@ export class Unit extends Entity {
     this.cdM2 = 12;
     this.cdM3 = 20;
     this.heroClass = null;
-    this.levelStacks = 0;
+    this.level = 1;
     this.inventory = [];
     this.targetId = null;
     this.role = null;
@@ -362,22 +362,35 @@ export class Projectile extends Entity {
 }
 
 export class NeutralCreep extends Entity {
-  constructor(x, y, tier = 1) {
+  constructor(x, y, kind = 'beast') {
     super(x, y, -1);
-    this.tier = tier;
-    this.radius = 12 + 4 * (tier - 1);
-    this.maxHp = 160 + 140 * (tier - 1);
-    this.hp = this.maxHp;
-    this.dps = 18 + 10 * (tier - 1);
-    this.attackRange = 26 + 6 * (tier - 1);
-    this.leash = 320 + 60 * (tier - 1);
+    this.kind = kind;
     this.homeX = x;
     this.homeY = y;
-    this.aggro = false;
+    const stats = {
+      mage: { hp: 120, dps: 24, range: 260, speed: 80, radius: 12 },
+      beast: { hp: 260, dps: 30, range: 40, speed: 90, radius: 14 },
+      dwarf: { hp: 180, dps: 26, range: 40, speed: 80, radius: 14 },
+      troll: { hp: 520, dps: 55, range: 50, speed: 70, radius: 18 }
+    }[kind] || { hp: 160, dps: 22, range: 30, speed: 80, radius: 14 };
+    this.maxHp = stats.hp;
+    this.hp = stats.hp;
+    this.dps = stats.dps;
+    this.attackRange = stats.range;
+    this.baseSpeed = stats.speed;
+    this.speed = stats.speed;
+    this.radius = stats.radius;
+    this.leash = 360;
+    this.vision = 300;
     this.attackCd = 0;
-    this.vision = 280 + 40 * (tier - 1);
     this.awarded = false;
     this.regen = 0.2;
+  }
+  damage(n, killerOwner = null) {
+    if (this.kind === 'dwarf' && Math.random() < 0.25) {
+      n *= 0.5;
+    }
+    super.damage(n, killerOwner);
   }
   update(dt) {
     if (this.dead) return;
@@ -391,19 +404,20 @@ export class NeutralCreep extends Entity {
     const md = Math.sqrt(bd);
     if (!this.aggro && md < this.leash) this.aggro = true;
     if (this.aggro && tgt && md < this.leash * 1.2) {
+      const sp = (this.kind === 'beast' && this.hp < this.maxHp * 0.5) ? this.baseSpeed * 1.5 : this.baseSpeed;
       if (md > this.attackRange) {
-        moveEntity(this, tgt.x - this.x, tgt.y - this.y, 80, dt);
+        moveEntity(this, tgt.x - this.x, tgt.y - this.y, sp, dt);
       } else {
         this.attackCd -= dt;
         if (this.attackCd <= 0) {
-          this.attackCd = .65;
+          this.attackCd = this.kind === 'mage' ? 1.2 : 0.75;
           tgt.damage(this.dps, -1);
         }
       }
     } else {
       const dx = this.homeX - this.x, dy = this.homeY - this.y, d = Math.hypot(dx, dy);
       if (d > 2) {
-        moveEntity(this, dx, dy, 60, dt);
+        moveEntity(this, dx, dy, this.baseSpeed * 0.75, dt);
       }
       this.aggro = false;
     }
@@ -411,7 +425,8 @@ export class NeutralCreep extends Entity {
   draw() {
     if (!globalThis.isExplored(this.x, this.y)) return;
     const s = globalThis.worldToScreen(this.x, this.y);
-    const col = this.tier >= 3 ? '#b86' : (this.tier === 2 ? '#a68' : '#9fb2a1');
+    const colors = { mage: '#9bf', beast: '#9fb2a1', dwarf: '#a68', troll: '#b86' };
+    const col = colors[this.kind] || '#9fb2a1';
     globalThis.drawSprite('unit', s.x, s.y, globalThis.world.zoom * 1.25, { o: col });
     globalThis.drawHp(s.x, s.y - 18 * globalThis.world.zoom, this.hp / this.maxHp);
   }
