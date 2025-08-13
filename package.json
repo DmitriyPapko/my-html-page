@@ -1,7 +1,7 @@
 {
-  "name": "br",
+  "name": "my-html-page",
   "version": "1.0.0",
-  "description": "",
+  "description": "A simple static HTML page project.",
   "main": "index.js",
   "scripts": {
     "test": "node test/ai.test.js"
@@ -10,8 +10,8 @@
     "type": "git",
     "url": "git+https://github.com/DmitriyPapko/my-html-page.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["html", "static", "example"],
+  "author": "Dmitriy Papko",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/DmitriyPapko/my-html-page/issues"
