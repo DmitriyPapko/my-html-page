@@ -24,21 +24,21 @@
   <div class="panel" id="buildingPanel" style="display:none"></div>
   <div class="panel" id="workerBuild" style="display:none"></div>
 
-  <div class="panel" id="abilityBar" style="display:none">
+  <div class="panel" id="heroPanel" style="display:none">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
       <div id="heroName" style="font-weight:700">Герой</div>
       <div class="pill" id="heroHP">HP 0/0</div>
       <div class="pill" id="heroMP">MP 0/0</div>
       <div class="pill" id="heroLVL">Lvl 0</div>
     </div>
-    <div style="display:flex;align-items:center;justify-content:center;gap:10px">
+    <div id="expBar"><div id="expFill"></div></div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:4px">
       <button class="btn" id="ab1">1</button>
       <button class="btn" id="ab2">2</button>
       <button class="btn" id="ab3">3</button>
     </div>
+    <div id="abilityDesc"></div>
   </div>
-
-  <div class="panel" id="abilityDesc" style="display:none"></div>
 
   <div class="panel" id="invPanel">
     <div style="font-weight:700;margin-bottom:6px">🎒 Предметы героя</div>
@@ -72,6 +72,15 @@
       <div style="opacity:.85;margin-top:8px;font-size:14px">ЛКМ — выбор / ПКМ — приказ. Дабл‑клик — выбрать всех юнитов
         типа на экране. WASD — камера. 1/2/3 — умения героя. U — использовать предмет. R — рабочие к работе. B/M/T/L/H —
         здание. F — туман.</div>
+    </div>
+  </div>
+
+  <div id="resultMenu">
+    <div class="card">
+      <h2 id="resultText">Победа!</h2>
+      <div style="display:flex;justify-content:center;margin-top:12px">
+        <button id="btnResultRestart" class="btn">В меню</button>
+      </div>
     </div>
   </div>
 

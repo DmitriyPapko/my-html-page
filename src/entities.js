@@ -362,22 +362,27 @@ export class Projectile extends Entity {
 }
 
 export class NeutralCreep extends Entity {
-  constructor(x, y, tier = 1) {
+  constructor(x, y, kind = 'beast') {
     super(x, y, -1);
-    this.tier = tier;
-    this.radius = 12 + 4 * (tier - 1);
-    this.maxHp = 160 + 140 * (tier - 1);
+    this.kind = kind;
+    if (kind === 'mage') { this.maxHp = 140; this.dps = 24; this.attackRange = 260; this.leash = 340; this.tier = 1; }
+    else if (kind === 'gnome') { this.maxHp = 220; this.dps = 22; this.attackRange = 50; this.leash = 360; this.block = 0.25; this.tier = 2; }
+    else if (kind === 'troll') { this.maxHp = 500; this.dps = 40; this.attackRange = 40; this.leash = 380; this.tier = 3; }
+    else { this.maxHp = 360; this.dps = 30; this.attackRange = 30; this.leash = 360; this.tier = 2; this.kind = 'beast'; }
     this.hp = this.maxHp;
-    this.dps = 18 + 10 * (tier - 1);
-    this.attackRange = 26 + 6 * (tier - 1);
-    this.leash = 320 + 60 * (tier - 1);
+    this.radius = 12 + 4 * (this.tier - 1);
     this.homeX = x;
     this.homeY = y;
     this.aggro = false;
     this.attackCd = 0;
-    this.vision = 280 + 40 * (tier - 1);
+    this.vision = 280 + 40 * (this.tier - 1);
     this.awarded = false;
     this.regen = 0.2;
+    this.baseSpeed = 80;
+  }
+  damage(n, killerOwner = null) {
+    if (this.kind === 'gnome' && Math.random() < 0.25) n *= 0.5;
+    super.damage(n, killerOwner);
   }
   update(dt) {
     if (this.dead) return;
@@ -390,9 +395,11 @@ export class NeutralCreep extends Entity {
     }
     const md = Math.sqrt(bd);
     if (!this.aggro && md < this.leash) this.aggro = true;
+    let spd = this.baseSpeed;
+    if (this.kind === 'beast' && this.hp < this.maxHp * 0.4) spd *= 1.5;
     if (this.aggro && tgt && md < this.leash * 1.2) {
       if (md > this.attackRange) {
-        moveEntity(this, tgt.x - this.x, tgt.y - this.y, 80, dt);
+        moveEntity(this, tgt.x - this.x, tgt.y - this.y, spd, dt);
       } else {
         this.attackCd -= dt;
         if (this.attackCd <= 0) {
@@ -403,7 +410,7 @@ export class NeutralCreep extends Entity {
     } else {
       const dx = this.homeX - this.x, dy = this.homeY - this.y, d = Math.hypot(dx, dy);
       if (d > 2) {
-        moveEntity(this, dx, dy, 60, dt);
+        moveEntity(this, dx, dy, spd, dt);
       }
       this.aggro = false;
     }
@@ -411,7 +418,10 @@ export class NeutralCreep extends Entity {
   draw() {
     if (!globalThis.isExplored(this.x, this.y)) return;
     const s = globalThis.worldToScreen(this.x, this.y);
-    const col = this.tier >= 3 ? '#b86' : (this.tier === 2 ? '#a68' : '#9fb2a1');
+    let col = '#9fb2a1';
+    if (this.kind === 'mage') col = '#8ad';
+    else if (this.kind === 'gnome') col = '#b86';
+    else if (this.kind === 'troll') col = '#a44';
     globalThis.drawSprite('unit', s.x, s.y, globalThis.world.zoom * 1.25, { o: col });
     globalThis.drawHp(s.x, s.y - 18 * globalThis.world.zoom, this.hp / this.maxHp);
   }
