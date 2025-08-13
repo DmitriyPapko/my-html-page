@@ -68,11 +68,17 @@ function aiThink(dt, id) {
       hero.setTarget(tgt);
     }
   }
+  // early army neutral farming
+  const army = P.units.filter(u => u.type !== 'worker' && !u.isHero);
+  if (army.length >= 3 && army.length < P.aiPlan.pushAt) {
+    const nt = nearestNeutralCamp(P, neutral, dist2);
+    if (nt) { army.forEach(u => { if (!u.retreat) u.setTarget(nt); }); }
+  }
   // army rally / attack
-  if (P.units.filter(u => u.type !== 'worker' && !u.isHero).length >= P.aiPlan.pushAt) {
+  if (army.length >= P.aiPlan.pushAt) {
     const enemyHero = players[0].hero && !players[0].hero.dead ? players[0].hero : null;
     const tgt = enemyHero || players[0].structures.find(s => !s.isGhost) || players[0].units.find(u => !u.isHero);
-    if (tgt) { P.units.filter(u => u.type !== 'worker').forEach(u => { if (!u.retreat) u.setTarget(tgt); }); }
+    if (tgt) { army.forEach(u => { if (!u.retreat) u.setTarget(tgt); }); }
   }
 }
 function nearestNeutralCamp(P, neutral, dist2) {
