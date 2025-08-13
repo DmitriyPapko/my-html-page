@@ -36,7 +36,17 @@ function aiThink(dt, id) {
   if (!players[id].ai) return;
   if (!players[id].aiPlan) aiInitPlan(players[id]);
   const P = players[id];
-  const HQ = P.structures.find(s => s.kind === 'hq');
+  let HQ = P.structures.find(s => s.kind === 'hq' || s.kind === 'square');
+  if (!HQ) {
+    const cost = COSTS.square;
+    const px = P.startX || 0, py = P.startY || 0;
+    if (P.res.rice >= cost.rice && P.res.water >= cost.water && !isBlocked(px, py) && placeGhost(id, px, py, 'square')) {
+      const g = P.structures.find(s => s.isGhost && s.kind === 'square');
+      const w = P.units.find(u => u.type === 'worker');
+      if (g && w) { w.state = 'build'; w.buildTargetId = g.id; }
+    }
+    HQ = P.structures.find(s => s.kind === 'square');
+  }
   // buildings
   if (P.aiPlan.nextBuild < P.aiPlan.open.length && HQ) {
     const kind = P.aiPlan.open[P.aiPlan.nextBuild]; const cost = COSTS[kind];

@@ -93,7 +93,7 @@ function drawWeather(dt) {
       }
 
       /* ==== Training & buildings ==== */
-      const COSTS = { barracks: { rice: 180, water: 70 }, mBarracks: { rice: 220, water: 110 }, well: { rice: 140, water: 0 }, range: { rice: 160, water: 80 }, altar: { rice: 200, water: 140 } };
+      const COSTS = { barracks: { rice: 180, water: 70 }, mBarracks: { rice: 220, water: 110 }, well: { rice: 140, water: 0 }, range: { rice: 160, water: 80 }, altar: { rice: 200, water: 140 }, square: { rice: 220, water: 120 } };
       function placeGhost(owner, x, y, kind) { const cost = COSTS[kind] || { rice: 0, water: 0 }; const R = players[owner].res; if (R.rice < cost.rice || R.water < cost.water) return false; if (isBlocked(x, y)) return false; R.rice -= cost.rice; if (owner === 0) updateRes(); const g = new Structure(x, y, owner, kind, true); players[owner].structures.push(g); return true; }
       function trainUnit(owner, barr, unitType) {
         if (players[owner].units.filter(u => !u.dead && !u.isHero).length >= POP_CAP) return false;
@@ -129,8 +129,7 @@ function drawWeather(dt) {
         }
       };
       function setHeroUI(h) {
-        const othersSel = players[0].units.some(u => u.selected && u !== h) || players[0].structures.some(s => s.selected);
-        if (!h || h.dead || !h.selected || othersSel) { heroPanel.style.display = 'none'; invPanel.style.display = 'none'; return; }
+        if (!h || h.dead || !h.selected) { heroPanel.style.display = 'none'; invPanel.style.display = 'none'; return; }
         heroPanel.style.display = 'block'; invPanel.style.display = 'block';
         heroName.textContent = h.heroName + ' (' + h.heroClass + ')';
         heroHP.textContent = `HP ${h.hp | 0}/${h.maxHp | 0}`;
@@ -176,7 +175,7 @@ function drawWeather(dt) {
           hero.maxHp *= 1.2; hero.hp = hero.maxHp;
           hero.dps *= 1.2;
           hero.baseSpeed *= 1.2; hero.speed = hero.baseSpeed;
-          hero.regen *= 1.2; hero.mpRegen *= 1.2; hero.attackRange *= 1.2;
+          hero.regen *= 1.2; hero.mpRegen *= 1.2; if (hero.heroClass !== 'paladin') hero.attackRange *= 1.2;
         }
         if (hero.owner === 0) setHeroUI(hero);
       }
@@ -333,7 +332,7 @@ function drawWeather(dt) {
         if (b.kind === 'barracks') { add('Мечник (🍚60/💧24)', () => b.queue.push('soldier')); }
         if (b.kind === 'mBarracks') { add('Маг (🍚80/💧46)', () => b.queue.push('mage')); }
         if (b.kind === 'range') { add('Лучник (🍚70/💧36)', () => b.queue.push('archer')); }
-        if (b.kind === 'altar') { add('Возродить героя', () => { const P = players[0]; if (!P.hero || P.hero.dead) { setTimeout(() => spawnHero(0, b.x + 40, b.y - 20, P.chosenClass), 20000); } }); }
+        if (b.kind === 'altar') { add('Возродить героя', () => { const P = players[0]; if ((!P.hero || P.hero.dead) && !b.queue.includes('hero')) { b.queue.push('hero'); } }); }
       }
       function renderWorkerBuildPanel() {
         const selected = players[0].units.filter(u => u.selected && u.type === 'worker'); if (selected.length === 0) { workerBuild.style.display = 'none'; workerBuild.innerHTML = ''; return; } workerBuild.style.display = 'flex'; workerBuild.innerHTML = '';
@@ -363,7 +362,8 @@ function drawWeather(dt) {
               abilityDesc.textContent = 'Маг: наносит урон с расстояния и поддерживает союзников.';
             }
           } else if (e instanceof Structure) {
-            t = 'Здание: ' + e.kind;
+            const names = { square: 'Площадь' };
+            t = 'Здание: ' + (names[e.kind] || e.kind);
             extra = `HP: ${(e.hp | 0)}/${(e.maxHp | 0)}\nOwner: ${owner}`;
           } else {
             t = 'Нейтрал';
@@ -398,7 +398,7 @@ function drawWeather(dt) {
       }
 
       /* ==== Utils ==== */
-Object.assign(globalThis, { players, neutral, drops, projectiles, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes, placeGhost, trainUnit, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel, updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, getById, enemiesFor, Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, input, setHeroUI });
+      Object.assign(globalThis, { players, neutral, drops, projectiles, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes, placeGhost, trainUnit, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel, updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, getById, enemiesFor, Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, input, setHeroUI, spawnHero });
 
       await import("./ui.js");
 await import("./terrain.js");
@@ -416,6 +416,7 @@ await import("./ai.js");
         const pos = [{ x: 900, y: 900 }, { x: world.width - 1200, y: 1200 }, { x: world.width - 1800, y: world.height - 1400 }];
         const playerClass = await chooseHeroClass();
         for (let i = 0; i < 3; i++) {
+          players[i].startX = pos[i].x; players[i].startY = pos[i].y;
           const HQ = new Structure(pos[i].x, pos[i].y, i, 'hq', false); players[i].structures.push(HQ);
           for (let k = 0; k < 6; k++) { const w = new Unit(HQ.x + (k % 3) * 24, HQ.y + 60 + Math.floor(k / 3) * 24, i, 'worker'); players[i].units.push(w); w.role = (k % 2 === 0) ? 'rice' : 'water'; }
           const cls = (i === 0 ? playerClass : (Math.random() < 0.34 ? 'paladin' : (Math.random() < 0.67 ? 'rogue' : 'archmage')));
