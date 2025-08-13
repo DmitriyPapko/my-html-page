@@ -82,7 +82,15 @@ function drawWeather(dt) {
       const riceNodes = [], waterNodes = [];
       const resUI = { rice: document.getElementById('resRice'), water: document.getElementById('resWater'), pop: document.getElementById('pop') };
       const POP_CAP = 20;
-      function updateRes() { resUI.rice.textContent = players[0].res.rice | 0; resUI.water.textContent = players[0].res.water | 0; resUI.pop.textContent = players[0].units.filter(u => !u.dead && !u.isHero).length; }
+      function updateRes() {
+        resUI.rice.textContent = players[0].res.rice | 0;
+        resUI.water.textContent = players[0].res.water | 0;
+        resUI.pop.textContent = players[0].units.filter(u => !u.dead && !u.isHero).length;
+        if (globalThis.updateIdleWorkers) {
+          const idle = players[0].units.filter(u => u.type === 'worker' && !u.dead && u.state === 'idle').length;
+          globalThis.updateIdleWorkers(idle);
+        }
+      }
 
       /* ==== Training & buildings ==== */
       const COSTS = { barracks: { rice: 180, water: 70 }, mBarracks: { rice: 220, water: 110 }, well: { rice: 140, water: 0 }, range: { rice: 160, water: 80 }, altar: { rice: 200, water: 140 } };

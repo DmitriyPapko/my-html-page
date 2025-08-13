@@ -83,6 +83,9 @@ export class Unit extends Entity {
     this.regen = 0.25;
     this.auraTimer = 0;
     this.buildTargetId = null;
+    this.workNodeId = null;
+    this.alert = null;
+    this.alertTimer = 0;
   }
   setDest(x, y) {
     this.destX = x;
@@ -102,11 +105,24 @@ export class Unit extends Entity {
     const P = globalThis.players[this.owner];
     const HQ = P.structures.find(s => s.kind === 'hq');
     const node = (this.role === 'rice' ? nearestNode('rice', P) : nearestNode('water', P));
-    if (!HQ || !node) return;
+    if (!HQ || !node) {
+      this.state = 'idle';
+      this.workNodeId = null;
+      this.alert = '!';
+      this.alertTimer = 2;
+      return;
+    }
+    if (this.workNodeId !== node.id && this.state !== 'to_hq') {
+      this.workNodeId = node.id;
+      this.state = 'to_node';
+      this.destX = node.x + globalThis.rand(-24, 24);
+      this.destY = node.y + globalThis.rand(-24, 24);
+    }
     if (this.state === 'idle') {
       this.state = 'to_node';
       this.destX = node.x + globalThis.rand(-24, 24);
       this.destY = node.y + globalThis.rand(-24, 24);
+      this.workNodeId = node.id;
     }
     if (this.state === 'to_node') {
       const dx = this.destX - this.x, dy = this.destY - this.y, d = Math.hypot(dx, dy);
@@ -142,6 +158,7 @@ export class Unit extends Entity {
         this.state = 'to_node';
         this.destX = node.x + globalThis.rand(-24, 24);
         this.destY = node.y + globalThis.rand(-24, 24);
+        this.workNodeId = node.id;
       }
     }
   }
@@ -198,6 +215,7 @@ export class Unit extends Entity {
     if (this.speedBuff > 0) { this.speedBuff = Math.max(0, this.speedBuff - dt); }
     if (this.slow > 0) { this.slow = Math.max(0, this.slow - dt); }
     if (this.summonTimer > 0) { this.summonTimer -= dt; if (this.summonTimer <= 0) { this.dead = true; } }
+    if (this.alertTimer > 0) { this.alertTimer = Math.max(0, this.alertTimer - dt); }
     if (this.state === 'build') {
       const target = getById(this.buildTargetId);
       if (!target || !target.isGhost) { this.state = 'idle'; this.buildTargetId = null; }
@@ -234,6 +252,11 @@ export class Unit extends Entity {
     const spr = this.isHero ? 'hero' : (this.type === 'archer' ? 'archer' : (this.type === 'mage' ? 'mage' : 'soldier'));
     globalThis.drawSprite(spr, s.x, s.y, globalThis.world.zoom * 1.25, { o: col });
     globalThis.drawHp(s.x, s.y - 18 * globalThis.world.zoom, this.hp / this.maxHp);
+    if (this.alertTimer > 0 && this.alert) {
+      globalThis.ctx.fillStyle = '#fff';
+      globalThis.ctx.font = `${14 * globalThis.world.zoom}px system-ui`;
+      globalThis.ctx.fillText(this.alert, s.x - 4 * globalThis.world.zoom, s.y - 26 * globalThis.world.zoom);
+    }
     if (this.auraTimer > 0) {
       globalThis.ctx.strokeStyle = 'rgba(255,215,0,0.5)';
       globalThis.ctx.beginPath();

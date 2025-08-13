@@ -9,6 +9,14 @@ const resultMenu = document.getElementById('resultMenu');
 const resultText = document.getElementById('resultText');
 const btnResultRestart = document.getElementById('btnResultRestart');
 
+const uiRoot = document.getElementById('ui');
+const idlePill = document.createElement('span');
+idlePill.className = 'pill';
+idlePill.innerHTML = '⛏ Idle: <span id="idleWorkers">0</span>';
+uiRoot.appendChild(idlePill);
+const idleSpan = idlePill.querySelector('#idleWorkers');
+globalThis.updateIdleWorkers = (n) => { idleSpan.textContent = n; };
+
 globalThis.paused = true;
 globalThis.muted = false;
 globalThis.fogEnabled = true;
