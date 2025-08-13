@@ -4,7 +4,7 @@
   "description": "A simple static HTML page project.",
   "main": "index.js",
   "scripts": {
-    "test": "node test/ai.test.js"
+    "test": "node test/ai.test.js && node test/mp-regen.test.js"
   },
   "repository": {
     "type": "git",

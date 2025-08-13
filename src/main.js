@@ -62,7 +62,7 @@ let simTime = 0;
       function setHeroUI(h) { if (!h) { abilityBar.style.display = 'none'; invPanel.style.display = 'none'; return; } abilityBar.style.display = 'block'; invPanel.style.display = 'block'; heroName.textContent = h.heroName + ' (' + h.heroClass + ')'; heroHP.textContent = `HP ${h.hp | 0}/${h.maxHp | 0}`; heroMP.textContent = `MP ${h.mp | 0}/${h.maxMp | 0}`; heroLVL.textContent = 'Lvl ' + h.levelStacks; }
       ab1.onclick = () => tryCast(1); ab2.onclick = () => tryCast(2); ab3.onclick = () => tryCast(3);
       function spawnHero(owner, x, y, cls = null) {
-        const h = new Unit(x, y, owner, 'soldier'); h.isHero = true; h.maxHp = 420; h.hp = 420; h.maxMp = 160; h.mp = 120; h.dps = 50; h.attackRange = 40; h.vision = 560; h.inventory = []; h.levelStacks = 0; h.regen = 1.2;
+        const h = new Unit(x, y, owner, 'soldier'); h.isHero = true; h.maxHp = 420; h.hp = 420; h.maxMp = 160; h.mp = 120; h.dps = 50; h.attackRange = 40; h.vision = 560; h.inventory = []; h.levelStacks = 0; h.regen = 1.2; h.mpRegen = 0.8;
         if (!cls) { const r = Math.random(); cls = r < 0.34 ? 'paladin' : (r < 0.67 ? 'rogue' : 'archmage'); }
         h.heroClass = cls;
         if (cls === 'paladin') { h.heroName = 'Паладин'; h.cdM1 = 8; h.cdM2 = 12; h.cdM3 = 16; }

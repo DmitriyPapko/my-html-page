@@ -49,6 +49,7 @@ export class Unit extends Entity {
     this.isHero = false;
     this.mp = 0;
     this.maxMp = 0;
+    this.mpRegen = 0;
     this.cd1 = 0;
     this.cd2 = 0;
     this.cd3 = 0;
@@ -172,6 +173,9 @@ export class Unit extends Entity {
     if (this.dead) return;
     if (this.hp < this.maxHp) {
       this.hp = Math.min(this.maxHp, this.hp + this.regen * dt * 60);
+    }
+    if (this.mp < this.maxMp) {
+      this.mp = Math.min(this.maxMp, this.mp + this.mpRegen * dt * 60);
     }
     this.cd1 = Math.max(0, this.cd1 - dt);
     this.cd2 = Math.max(0, this.cd2 - dt);
