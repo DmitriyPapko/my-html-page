@@ -1,9 +1,29 @@
 /* ==== AI ==== */
 function aiInitPlan(P) {
-  const cls = P.hero.heroClass;
-  if (cls === 'paladin') { P.aiPlan = { comp: { soldier: 0.6, archer: 0.4, mage: 0.0 }, open: ['well', 'barracks', 'range'], state: 'farm', pushAt: 10, nextBuild: 0 }; }
-  else if (cls === 'rogue') { P.aiPlan = { comp: { soldier: 0.4, archer: 0.6, mage: 0.0 }, open: ['well', 'range', 'barracks'], state: 'farm', pushAt: 8, nextBuild: 0 }; }
-  else { P.aiPlan = { comp: { soldier: 0.2, archer: 0.4, mage: 0.4 }, open: ['well', 'mBarracks', 'range'], state: 'farm', pushAt: 12, nextBuild: 0 }; }
+  const cls = P.hero && P.hero.heroClass;
+  const plans = {
+    paladin: {
+      comp: { soldier: 0.6, archer: 0.4, mage: 0.0 },
+      open: ['well', 'barracks', 'range'],
+      state: 'farm',
+      pushAt: 10,
+      nextBuild: 0,
+    },
+    rogue: {
+      comp: { soldier: 0.4, archer: 0.6, mage: 0.0 },
+      open: ['well', 'range', 'barracks'],
+      state: 'farm',
+      pushAt: 8,
+      nextBuild: 0,
+    },
+  };
+  P.aiPlan = plans[cls] || {
+    comp: { soldier: 0.2, archer: 0.4, mage: 0.4 },
+    open: ['well', 'mBarracks', 'range'],
+    state: 'farm',
+    pushAt: 12,
+    nextBuild: 0,
+  };
 }
 function aiThink(dt, id) {
   const players = globalThis.players;
@@ -61,12 +81,18 @@ function nearestNeutralCamp(P) {
     console.warn('nearestNeutralCamp: no structures available');
     return null;
   }
-  let best = null, bd = 1e9;
+  if (!neutral || !Array.isArray(neutral.units) || neutral.units.length === 0) {
+    console.warn('nearestNeutralCamp: no neutral units');
+    return null;
+  }
+  const origin = P.structures[0];
+  let best = null;
+  let bestDist = Infinity;
   for (const n of neutral.units) {
     if (n.dead) continue;
-    const d = dist2(P.structures[0].x, P.structures[0].y, n.x, n.y);
-    if (d < bd) {
-      bd = d;
+    const d = dist2(origin.x, origin.y, n.x, n.y);
+    if (d < bestDist) {
+      bestDist = d;
       best = n;
     }
   }
