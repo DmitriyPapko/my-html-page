@@ -81,6 +81,8 @@ export class Unit extends Entity {
     this.summonTimer = 0;
     this.retreat = false;
     this.regen = 0.25;
+    this.auraTimer = 0;
+    this.buildTargetId = null;
   }
   setDest(x, y) {
     this.destX = x;
@@ -185,12 +187,23 @@ export class Unit extends Entity {
     if (this.mp < this.maxMp) {
       this.mp = Math.min(this.maxMp, this.mp + this.mpRegen * dt * 60);
     }
+    if (this.auraTimer > 0) { this.auraTimer = Math.max(0, this.auraTimer - dt); }
     this.cd1 = Math.max(0, this.cd1 - dt);
     this.cd2 = Math.max(0, this.cd2 - dt);
     this.cd3 = Math.max(0, this.cd3 - dt);
     if (this.speedBuff > 0) { this.speedBuff = Math.max(0, this.speedBuff - dt); }
     if (this.slow > 0) { this.slow = Math.max(0, this.slow - dt); }
     if (this.summonTimer > 0) { this.summonTimer -= dt; if (this.summonTimer <= 0) { this.dead = true; } }
+    if (this.state === 'build') {
+      const target = getById(this.buildTargetId);
+      if (!target || !target.isGhost) { this.state = 'idle'; this.buildTargetId = null; }
+      else {
+        const dx = target.x - this.x, dy = target.y - this.y, d = Math.hypot(dx, dy);
+        if (d > 40) { const v = this.getCurrentSpeed(); moveEntity(this, dx, dy, v, dt); }
+        else { target.hp += 30 * dt; if (target.hp >= target.maxHp) { target.isGhost = false; target.hp = 520; target.maxHp = 520; this.state = 'idle'; this.buildTargetId = null; if (typeof globalThis.beep === 'function' && !globalThis.muted) globalThis.beep(300, 0.08, 'triangle', 0.05); } }
+      }
+      return;
+    }
     if (this.type === 'worker' && !this.isHero) { this.updateWorker(dt); return; }
     this.updateRetreat(dt);
     const target = getById(this.targetId);
@@ -216,6 +229,12 @@ export class Unit extends Entity {
     const col = globalThis.players[this.owner]?.color || '#9fb2a1';
     globalThis.drawSprite('unit', s.x, s.y, globalThis.world.zoom * 1.25, { o: col });
     globalThis.drawHp(s.x, s.y - 18 * globalThis.world.zoom, this.hp / this.maxHp);
+    if (this.auraTimer > 0) {
+      globalThis.ctx.strokeStyle = 'rgba(255,215,0,0.5)';
+      globalThis.ctx.beginPath();
+      globalThis.ctx.arc(s.x, s.y, 80 * globalThis.world.zoom, 0, 6.283);
+      globalThis.ctx.stroke();
+    }
     if (this.isHero) {
       globalThis.ctx.strokeStyle = '#ffd27a';
       globalThis.ctx.beginPath();
@@ -246,8 +265,6 @@ export class Structure extends Entity {
   }
   update(dt) {
     if (this.isGhost) {
-      this.hp = Math.min(this.maxHp, this.hp + 15 * dt);
-      if (this.hp >= this.maxHp) this.isGhost = false;
       return;
     }
     if (this.queue.length > 0) {

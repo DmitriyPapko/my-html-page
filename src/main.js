@@ -10,7 +10,7 @@ const dist2 = (x1, y1, x2, y2) => { const dx = x2 - x1, dy = y2 - y1; return dx 
 const cvs = document.getElementById('game'), ctx = cvs.getContext('2d'); ctx.imageSmoothingEnabled = false;
 const mini = document.getElementById('minimap'), mctx = mini.getContext('2d'); mctx.imageSmoothingEnabled = false;
 const DPR = Math.max(1, window.devicePixelRatio || 1);
-const world = { width: 12000, height: 8000, camX: 0, camY: 0, zoom: 1 };
+const world = { width: 12000, height: 8000, camX: 0, camY: 0, zoom: 1.25 };
 function resize() { const w = cvs.clientWidth, h = cvs.clientHeight; cvs.width = Math.floor(w * DPR); cvs.height = Math.floor(h * DPR); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
 new ResizeObserver(resize).observe(cvs); resize();
 function screenToWorld(sx, sy) { return { x: sx / world.zoom + world.camX, y: sy / world.zoom + world.camY }; }
@@ -90,14 +90,24 @@ let simTime = 0;
       }
       ab1.onclick = () => tryCast(1); ab2.onclick = () => tryCast(2); ab3.onclick = () => tryCast(3);
       function spawnHero(owner, x, y, cls = null) {
-        const h = new Unit(x, y, owner, 'soldier'); h.isHero = true; h.maxHp = 420; h.hp = 420; h.maxMp = 160; h.mp = 120; h.dps = 50; h.attackRange = 40; h.vision = 560; h.inventory = []; h.levelStacks = 0; h.regen = 1.2; h.mpRegen = 0.8;
+        const h = new Unit(x, y, owner, 'soldier'); h.isHero = true; h.maxHp = 420; h.hp = 420; h.maxMp = 160; h.mp = 120; h.dps = 50; h.attackRange = 40; h.vision = 560; h.inventory = []; h.levelStacks = 0; h.regen = 0.83; h.mpRegen = 0.8;
         if (!cls) { const r = Math.random(); cls = r < 0.34 ? 'paladin' : (r < 0.67 ? 'rogue' : 'archmage'); }
-        h.heroClass = cls;
+        h.heroClass = cls; players[owner].chosenClass = cls;
         if (cls === 'paladin') { h.heroName = 'Паладин'; h.cdM1 = 8; h.cdM2 = 12; h.cdM3 = 16; }
         if (cls === 'rogue') { h.heroName = 'Разбойник'; h.cdM1 = 10; h.cdM2 = 9; h.cdM3 = 16; }
         if (cls === 'archmage') { h.heroName = 'Аркан‑маг'; h.cdM1 = 7; h.cdM2 = 18; h.cdM3 = 28; }
         h.onDeath = () => { if (owner === 0) { abilityBar.style.display = 'none'; invPanel.style.display = 'none'; } players[owner].hero = null; };
         players[owner].units.push(h); players[owner].hero = h; return h;
+      }
+      function chooseHeroClass() {
+        let cls = null;
+        const allowed = ['paladin', 'rogue', 'archmage'];
+        while (!allowed.includes(cls)) {
+          cls = prompt('Выберите героя: paladin, rogue или archmage', 'paladin');
+          if (cls === null) return 'paladin';
+          cls = cls.trim().toLowerCase();
+        }
+        return cls;
       }
       function heroGainFromNeutral(owner, tier) {
         const h = players[owner]?.hero; if (!h || h.dead) return;
@@ -125,18 +135,18 @@ let simTime = 0;
       }
       function applyItem(hero, itemKind) {
         if (itemKind === 'scroll_hp') {
-          hero.maxHp += 80; hero.hp = Math.min(hero.maxHp, hero.hp + 120);
+          hero.maxHp += 80; hero.hp = Math.min(hero.maxHp, hero.hp + 120); if (typeof beep === 'function' && !muted) beep(620, 0.08, 'triangle', 0.05);
         } else if (itemKind === 'scroll_dps') {
-          hero.dps += 10;
+          hero.dps += 10; hero.auraTimer = 20; if (typeof beep === 'function' && !muted) beep(720, 0.08, 'square', 0.06);
           setTimeout(() => { hero.dps -= 10; }, 20000);
         } else if (itemKind === 'ring_atk') {
-          hero.maxMp += 40; hero.mp += 40;
+          hero.maxMp += 40; hero.mp += 40; if (typeof beep === 'function' && !muted) beep(540, 0.08, 'sawtooth', 0.05);
         } else if (itemKind === 'boots') {
-          hero.baseSpeed += 20; hero.speed += 20;
+          hero.baseSpeed += 20; hero.speed += 20; if (typeof beep === 'function' && !muted) beep(480, 0.08, 'square', 0.05);
         } else if (itemKind === 'amulet') {
-          hero.maxHp += 120; hero.hp += 120;
+          hero.maxHp += 120; hero.hp += 120; if (typeof beep === 'function' && !muted) beep(660, 0.08, 'triangle', 0.05);
         } else if (itemKind === 'orb') {
-          hero.maxMp += 60; hero.mp += 60;
+          hero.maxMp += 60; hero.mp += 60; if (typeof beep === 'function' && !muted) beep(580, 0.08, 'sawtooth', 0.05);
         }
         if (hero.owner === 0) setHeroUI(hero);
       }
@@ -172,8 +182,10 @@ let simTime = 0;
 
       function entityAt(wx, wy) {
         function hit(arr, r) { let best = null, bD = 1e9; for (const e of arr) { if (e.dead) continue; const d = dist2(wx, wy, e.x, e.y); const rr = r(e); if (d <= rr * rr && d < bD) { bD = d; best = e; } } return best; }
-        const a = [...players[0].units, ...players[1].units, ...players[2].units, ...neutral.units]; const b = [...players[0].structures, ...players[1].structures, ...players[2].structures];
-        return hit(a, e => e.radius + 10) || hit(b, e => e.radius + 14) || null;
+        const a = [...players[0].units, ...players[1].units, ...players[2].units, ...neutral.units];
+        const b = [...players[0].structures, ...players[1].structures, ...players[2].structures];
+        const c = [...riceNodes, ...waterNodes];
+        return hit(a, e => e.radius + 10) || hit(b, e => e.radius + 14) || hit(c, e => e.radius) || null;
       }
       function unselectAll() { for (const p of [players[0], players[1], players[2]]) { for (const u of p.units) u.selected = false; for (const s of p.structures) s.selected = false; } for (const n of neutral.units) n.selected = false; }
       function selectSameTypeOnScreen(type) { const x1 = world.camX, y1 = world.camY, x2 = world.camX + cvs.width / DPR / world.zoom, y2 = world.camY + cvs.height / DPR / world.zoom; for (const u of players[0].units) { if (u.dead) continue; if (u.type === type) { if (u.x >= x1 && u.x <= x2 && u.y >= y1 && u.y <= y2) u.selected = true; } } }
@@ -194,9 +206,16 @@ let simTime = 0;
         } else if (e.button === 2) {
           if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; return; }
           const sel = players[0].units.filter(u => u.selected && !u.dead);
+          const tgt = entityAt(input.wx, input.wy);
+          if (sel.length === 0 && tgt && tgt.owner === 0) {
+            unselectAll(); tgt.selected = true; updatePanels(); return;
+          }
           if (sel.length) {
-            const tgt = entityAt(input.wx, input.wy);
-            if (tgt && tgt.owner !== 0) { sel.forEach(u => u.setTarget(tgt)); }
+            if (tgt instanceof Structure && tgt.isGhost && sel.some(u => u.type === 'worker')) {
+              sel.filter(u => u.type === 'worker').forEach(w => { w.state = 'build'; w.buildTargetId = tgt.id; });
+            } else if (tgt instanceof ResourceNode && sel.some(u => u.type === 'worker')) {
+              sel.filter(u => u.type === 'worker').forEach(w => { w.role = tgt.type; w.state = 'idle'; });
+            } else if (tgt && tgt.owner !== 0) { sel.forEach(u => u.setTarget(tgt)); }
             else { sel.forEach((u, i) => u.setDest(input.wx + i * 12, input.wy)); }
           }
         }
@@ -211,6 +230,7 @@ let simTime = 0;
         if (b.kind === 'barracks') { add('Мечник (🍚60/💧24)', () => b.queue.push('soldier')); }
         if (b.kind === 'mBarracks') { add('Маг (🍚80/💧46)', () => b.queue.push('mage')); }
         if (b.kind === 'range') { add('Лучник (🍚70/💧36)', () => b.queue.push('archer')); }
+        if (b.kind === 'altar') { add('Возродить героя', () => { const P = players[0]; if (!P.hero || P.hero.dead) { spawnHero(0, b.x + 40, b.y - 20, P.chosenClass); } }); }
       }
       function renderWorkerBuildPanel() {
         const selected = players[0].units.filter(u => u.selected && u.type === 'worker'); if (selected.length === 0) { workerBuild.style.display = 'none'; workerBuild.innerHTML = ''; return; } workerBuild.style.display = 'flex'; workerBuild.innerHTML = '';
@@ -251,10 +271,11 @@ await import("./ai.js");
         for (const p of players) { p.units.length = 0; p.structures.length = 0; p.hero = null; p.res.rice = 220; p.res.water = 100; p.aiPlan = null; }
         neutral.units.length = 0; drops.length = 0; riceNodes.length = 0; waterNodes.length = 0; explored.fill(0); visible.fill(0); updateRes();
         const pos = [{ x: 900, y: 900 }, { x: world.width - 1200, y: 1200 }, { x: world.width - 1800, y: world.height - 1400 }];
+        const playerClass = chooseHeroClass();
         for (let i = 0; i < 3; i++) {
           const HQ = new Structure(pos[i].x, pos[i].y, i, 'hq', false); players[i].structures.push(HQ);
           for (let k = 0; k < 6; k++) { const w = new Unit(HQ.x + (k % 3) * 24, HQ.y + 60 + Math.floor(k / 3) * 24, i, 'worker'); players[i].units.push(w); w.role = (k % 2 === 0) ? 'rice' : 'water'; } // 3/3
-          const cls = (i === 0 ? null : (Math.random() < 0.34 ? 'paladin' : (Math.random() < 0.67 ? 'rogue' : 'archmage')));
+          const cls = (i === 0 ? playerClass : (Math.random() < 0.34 ? 'paladin' : (Math.random() < 0.67 ? 'rogue' : 'archmage')));
           spawnHero(i, HQ.x + 80, HQ.y - 20, cls);
           riceNodes.push(new ResourceNode(HQ.x + 220, HQ.y + 160, 'rice')); waterNodes.push(new ResourceNode(HQ.x - 220, HQ.y + 160, 'water'));
         }
