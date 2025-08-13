@@ -15,18 +15,22 @@ globalThis.fogEnabled = true;
 
 btnStart.onclick = async () => {
   resultMenu.style.display = 'none';
+  menu.style.display = 'none';
   await globalThis.resetGame();
   globalThis.paused = false;
-  menu.style.display = 'none';
 };
 btnRestart.onclick = async () => {
   resultMenu.style.display = 'none';
+  menu.style.display = 'none';
   await globalThis.resetGame();
   globalThis.paused = false;
-  menu.style.display = 'none';
 };
 btnMute.onclick = () => { globalThis.muted = !globalThis.muted; btnMute.textContent = globalThis.muted ? 'Звук: выкл' : 'Звук: вкл'; };
-btnPause.onclick = () => { globalThis.paused = !globalThis.paused; menu.style.display = globalThis.paused ? 'flex' : 'none'; };
+btnPause.onclick = () => {
+  globalThis.paused = !globalThis.paused;
+  if (globalThis.paused) document.getElementById('heroSelect').style.display = 'none';
+  menu.style.display = globalThis.paused ? 'flex' : 'none';
+};
 btnFog.onclick = () => { globalThis.fogEnabled = !globalThis.fogEnabled; btnFog.textContent = globalThis.fogEnabled ? 'No Fog' : 'Fog'; };
 
 btnResultRestart.onclick = () => {
@@ -39,5 +43,7 @@ globalThis.showResultMenu = (msg) => {
   globalThis.paused = true;
   if (globalThis.setHeroUI) globalThis.setHeroUI(null);
   resultText.textContent = msg;
+  menu.style.display = 'none';
+  document.getElementById('heroSelect').style.display = 'none';
   resultMenu.style.display = 'flex';
 };
