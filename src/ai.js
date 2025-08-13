@@ -1,0 +1,56 @@
+/* ==== AI ==== */
+function aiInitPlan(P) {
+  const cls = P.hero.heroClass;
+  if (cls === 'paladin') { P.aiPlan = { comp: { soldier: 0.6, archer: 0.4, mage: 0.0 }, open: ['well', 'barracks', 'range'], state: 'farm', pushAt: 10, nextBuild: 0 }; }
+  else if (cls === 'rogue') { P.aiPlan = { comp: { soldier: 0.4, archer: 0.6, mage: 0.0 }, open: ['well', 'range', 'barracks'], state: 'farm', pushAt: 8, nextBuild: 0 }; }
+  else { P.aiPlan = { comp: { soldier: 0.2, archer: 0.4, mage: 0.4 }, open: ['well', 'mBarracks', 'range'], state: 'farm', pushAt: 12, nextBuild: 0 }; }
+}
+function aiThink(dt, id) {
+  const players = globalThis.players;
+  const COSTS = globalThis.COSTS;
+  const POP_CAP = globalThis.POP_CAP;
+  const placeGhost = globalThis.placeGhost;
+  const isBlocked = globalThis.isBlocked;
+  if (!players[id].ai) return;
+  if (!players[id].aiPlan) aiInitPlan(players[id]);
+  const P = players[id];
+  const HQ = P.structures.find(s => s.kind === 'hq');
+  // buildings
+  if (P.aiPlan.nextBuild < P.aiPlan.open.length && HQ) {
+    const kind = P.aiPlan.open[P.aiPlan.nextBuild]; const cost = COSTS[kind];
+    if (P.res.rice >= cost.rice && P.res.water >= cost.water) {
+      const dx = (kind === 'well') ? -160 : (Math.random() < 0.5 ? 180 : -180), dy = (kind === 'well') ? 120 : (Math.random() < 0.5 ? 160 : -160);
+      const px = HQ.x + dx, py = HQ.y + dy; if (!isBlocked(px, py) && placeGhost(id, px, py, kind)) { P.aiPlan.nextBuild++; }
+    }
+  }
+  // maintain 6 workers
+  const wcount = P.units.filter(u => u.type === 'worker').length;
+  if (wcount < 6 && HQ) {
+    if (P.res.rice >= 50 && P.res.water >= 12 && P.units.filter(u => !u.dead && !u.isHero).length < POP_CAP) { HQ.queue.push('worker'); }
+  }
+  // training
+  const barr = P.structures.find(s => s.kind === 'barracks' && !s.isGhost),
+        rng = P.structures.find(s => s.kind === 'range' && !s.isGhost),
+        mb = P.structures.find(s => s.kind === 'mBarracks' && !s.isGhost);
+  if (P.units.filter(u => !u.dead && !u.isHero).length < POP_CAP - 1) {
+    const r = Math.random();
+    if (barr && r < P.aiPlan.comp.soldier) barr.queue.push('soldier');
+    else if (rng && r < P.aiPlan.comp.soldier + P.aiPlan.comp.archer) rng.queue.push('archer');
+    else if (mb) mb.queue.push('mage');
+  }
+  // hero farms nearest neutral
+  const neutral = globalThis.neutral;
+  const hero = P.hero; if (hero && !hero.dead) { const tgt = nearestNeutralCamp(P); if (tgt) { hero.setTarget(tgt); } }
+  // army rally / attack
+  if (P.units.filter(u => u.type !== 'worker' && !u.isHero).length >= P.aiPlan.pushAt) {
+    const enemyHero = players[0].hero && !players[0].hero.dead ? players[0].hero : null;
+    const tgt = enemyHero || players[0].structures.find(s => !s.isGhost) || players[0].units.find(u => !u.isHero);
+    if (tgt) { P.units.filter(u => u.type !== 'worker').forEach(u => { if (!u.retreat) u.setTarget(tgt); }); }
+  }
+}
+function nearestNeutralCamp(P) {
+  const neutral = globalThis.neutral;
+  const { dist2 } = globalThis;
+  let best = null, bd = 1e9; for (const n of neutral.units) { if (n.dead) continue; const d = dist2(P.structures[0].x, P.structures[0].y, n.x, n.y); if (d < bd) { bd = d; best = n; } } return best;
+}
+Object.assign(globalThis, { aiInitPlan, aiThink, nearestNeutralCamp });
