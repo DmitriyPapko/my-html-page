@@ -1,29 +1,6 @@
 /* ==== Simple terrain + blockers (лес/река) ==== */
-import { drawSprite, toPixel } from './sprites.js';
-
 // Генерим «реки» (непроходимые) как вертикальные полосы и «лес» как кучки препятствий
 const blockers = []; // {x,y,r,kind}
-
-// pre-rendered tiles
-const TILE = 64;
-const grassTile = document.createElement('canvas');
-grassTile.width = grassTile.height = TILE;
-const gctx = grassTile.getContext('2d');
-gctx.imageSmoothingEnabled = false;
-drawSprite(gctx, 'grass', TILE / 2, TILE / 2, { scale: 4 });
-
-const waterTile = document.createElement('canvas');
-waterTile.width = waterTile.height = TILE;
-const wctx = waterTile.getContext('2d');
-wctx.imageSmoothingEnabled = false;
-drawSprite(wctx, 'water', TILE / 2, TILE / 2, { scale: 4 });
-
-function hash(x, y) {
-  let n = x * 374761393 + y * 668265263;
-  n = (n ^ (n >> 13)) * 1274126177;
-  return ((n ^ (n >> 16)) >>> 0) / 4294967295;
-}
-
 function genBlockers() {
   const { rand, clamp, world } = globalThis;
   blockers.length = 0;
@@ -37,34 +14,26 @@ function genBlockers() {
     blockers.push({ x: rand(600, world.width - 600), y: rand(600, world.height - 600), r: clamp(rand(24, 60), 24, 60), kind: 'tree' });
   }
 }
-
 function drawTerrain() {
-  const { world, cvs, ctx } = globalThis;
-  const startX = Math.floor(world.camX / TILE) * TILE;
-  const startY = Math.floor(world.camY / TILE) * TILE;
-  const endX = world.camX + cvs.width / world.zoom;
-  const endY = world.camY + cvs.height / world.zoom;
-  for (let y = startY; y <= endY; y += TILE) {
-    for (let x = startX; x <= endX; x += TILE) {
-      const sx = (x - world.camX) * world.zoom;
-      const sy = (y - world.camY) * world.zoom;
-      const tx = (x / TILE) | 0;
-      const ty = (y / TILE) | 0;
-      const img = hash(tx, ty) < 0.03 ? waterTile : grassTile;
-      ctx.drawImage(img, toPixel(sx), toPixel(sy), TILE * world.zoom, TILE * world.zoom);
+  const { world, cvs, worldToScreen } = globalThis;
+  const step = 64;
+  const startX = Math.floor(world.camX / step) * step,
+        startY = Math.floor(world.camY / step) * step,
+        endX = world.camX + cvs.width / world.zoom,
+        endY = world.camY + cvs.height / world.zoom;
+  for (let y = startY; y <= endY; y += step) {
+    for (let x = startX; x <= endX; x += step) {
+      const s = worldToScreen(x + step / 2, y + step / 2);
+      globalThis.drawSprite('grass', s.x, s.y, world.zoom * 4);
     }
   }
-}
-
-function drawBlockers() {
-  const { world, worldToScreen, ctx } = globalThis;
+  // реки/лес
   for (const b of blockers) {
     const s = worldToScreen(b.x, b.y);
     const sc = world.zoom * (b.r / 8);
-    drawSprite(ctx, b.kind === 'water' ? 'water' : 'tree', s.x, s.y, { scale: sc, shadow: b.kind === 'tree' });
+    globalThis.drawSprite(b.kind === 'water' ? 'water' : 'tree', s.x, s.y, sc);
   }
 }
-
 function isBlocked(wx, wy) {
   const { dist2 } = globalThis;
   for (const b of blockers) {
@@ -72,5 +41,4 @@ function isBlocked(wx, wy) {
   }
   return false;
 }
-Object.assign(globalThis, { blockers, genBlockers, drawTerrain, drawBlockers, isBlocked });
-export { blockers, genBlockers, drawTerrain, drawBlockers, isBlocked };
+Object.assign(globalThis, { blockers, genBlockers, drawTerrain, isBlocked });
