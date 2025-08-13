@@ -48,6 +48,16 @@ globalThis.beep = beep;
 let simTime = 0;
 let gameOver = false;
 const weather = { type: 'sun', particles: [] };
+const ITEM_NAMES = { scroll_hp: 'Свиток HP', scroll_dps: 'Свиток DPS', ring_atk: 'Кольцо маны', boots: 'Сапоги', amulet: 'Амулет', orb: 'Орб маны' };
+const ITEM_INFO = {
+  scroll_hp: 'Свиток HP: +80 к максимальному здоровью и лечит на 120',
+  scroll_dps: 'Свиток DPS: +10 урона на 20 сек',
+  ring_atk: 'Кольцо маны: +40 к мане',
+  boots: 'Сапоги: +20 к скорости',
+  amulet: 'Амулет: +120 к здоровью',
+  orb: 'Орб маны: +60 к мане'
+};
+const INV_KEYS = ['q', 'e', 'r', 'g', 't', 'y'];
 function setWeather(t) {
   weather.type = t;
   weather.particles.length = 0;
@@ -93,12 +103,28 @@ function drawWeather(dt) {
       }
 
       /* ==== Training & buildings ==== */
-      const COSTS = { barracks: { rice: 180, water: 70 }, mBarracks: { rice: 220, water: 110 }, well: { rice: 140, water: 0 }, range: { rice: 160, water: 80 }, altar: { rice: 200, water: 140 } };
-      function placeGhost(owner, x, y, kind) { const cost = COSTS[kind] || { rice: 0, water: 0 }; const R = players[owner].res; if (R.rice < cost.rice || R.water < cost.water) return false; if (isBlocked(x, y)) return false; R.rice -= cost.rice; if (owner === 0) updateRes(); const g = new Structure(x, y, owner, kind, true); players[owner].structures.push(g); return true; }
+      const COSTS = { barracks: { rice: 180, water: 70 }, mBarracks: { rice: 220, water: 110 }, well: { rice: 140, water: 0 }, range: { rice: 160, water: 80 }, altar: { rice: 200, water: 140 }, square: { rice: 220, water: 120 } };
+      function canPlace(owner, x, y, kind) {
+        const cost = COSTS[kind] || { rice: 0, water: 0 };
+        const R = players[owner].res;
+        if (R.rice < cost.rice || R.water < cost.water) return 'res';
+        if (isBlocked(x, y)) return 'block';
+        for (const n of riceNodes.concat(waterNodes)) {
+          if (dist2(x, y, n.x, n.y) <= (n.radius + 40) * (n.radius + 40)) return 'block';
+        }
+        return 'ok';
+      }
+      function placeGhost(owner, x, y, kind) {
+        const res = canPlace(owner, x, y, kind);
+        if (res !== 'ok') { if (owner === 0 && !muted) beep(res === 'res' ? 80 : 60, 0.1, 'sine', 0.05); return false; }
+        const cost = COSTS[kind] || { rice: 0, water: 0 };
+        const R = players[owner].res; R.rice -= cost.rice; R.water -= cost.water; if (owner === 0) updateRes();
+        const g = new Structure(x, y, owner, kind, true); players[owner].structures.push(g); return true;
+      }
       function trainUnit(owner, barr, unitType) {
         if (players[owner].units.filter(u => !u.dead && !u.isHero).length >= POP_CAP) return false;
         const cost = unitType === 'soldier' ? { rice: 60, water: 24 } : unitType === 'mage' ? { rice: 80, water: 46 } : unitType === 'archer' ? { rice: 70, water: 36 } : unitType === 'worker' ? { rice: 50, water: 12 } : { rice: 0, water: 0 };
-        const R = players[owner].res; if (R.rice < cost.rice || R.water < cost.water) return false; R.rice -= cost.rice; if (owner === 0) updateRes();
+        const R = players[owner].res; if (R.rice < cost.rice || R.water < cost.water) { if (owner === 0 && !muted) beep(80, 0.1, 'sine', 0.05); return false; } R.rice -= cost.rice; if (owner === 0) updateRes();
         const u = new Unit(barr.x + 36, barr.y, owner, unitType);
         if (unitType === 'soldier') { u.dps = 30; u.maxHp = 160; u.hp = 160; u.attackRange = 30; u.regen = 0.35; }
         if (unitType === 'archer') { u.dps = 20; u.maxHp = 120; u.hp = 120; u.attackRange = 250; u.vision = 520; u.regen = 0.25; }
@@ -129,8 +155,7 @@ function drawWeather(dt) {
         }
       };
       function setHeroUI(h) {
-        const othersSel = players[0].units.some(u => u.selected && u !== h) || players[0].structures.some(s => s.selected);
-        if (!h || h.dead || !h.selected || othersSel) { heroPanel.style.display = 'none'; invPanel.style.display = 'none'; return; }
+        if (!h || h.dead || !h.selected) { heroPanel.style.display = 'none'; invPanel.style.display = 'none'; return; }
         heroPanel.style.display = 'block'; invPanel.style.display = 'block';
         heroName.textContent = h.heroName + ' (' + h.heroClass + ')';
         heroHP.textContent = `HP ${h.hp | 0}/${h.maxHp | 0}`;
@@ -176,7 +201,7 @@ function drawWeather(dt) {
           hero.maxHp *= 1.2; hero.hp = hero.maxHp;
           hero.dps *= 1.2;
           hero.baseSpeed *= 1.2; hero.speed = hero.baseSpeed;
-          hero.regen *= 1.2; hero.mpRegen *= 1.2; hero.attackRange *= 1.2;
+          hero.regen *= 1.2; hero.mpRegen *= 1.2; if (hero.heroClass !== 'paladin') hero.attackRange *= 1.2;
         }
         if (hero.owner === 0) setHeroUI(hero);
       }
@@ -193,10 +218,10 @@ function drawWeather(dt) {
         for (let i = 0; i < cap; i++) {
           const slot = document.createElement('div'); slot.className = 'invSlot';
           if (arr[i]) {
-            const it = arr[i]; const names = { scroll_hp: 'Свиток HP', scroll_dps: 'Свиток DPS', ring_atk: 'Кольцо маны', boots: 'Сапоги', amulet: 'Амулет', orb: 'Орб маны' };
-            slot.textContent = names[it] || it;
-            slot.title = 'ЛКМ/ПКМ — использовать';
-            slot.onclick = (e) => { applyItem(hero, it); hero.inventory.splice(i, 1); renderInventory(hero); };
+            const it = arr[i];
+            slot.textContent = (ITEM_NAMES[it] || it) + ' [' + INV_KEYS[i].toUpperCase() + ']';
+            slot.title = (ITEM_INFO[it] || '') + '\nЛКМ/ПКМ — использовать';
+            slot.onclick = () => { applyItem(hero, it); hero.inventory.splice(i, 1); renderInventory(hero); };
             slot.oncontextmenu = (e) => { e.preventDefault(); applyItem(hero, it); hero.inventory.splice(i, 1); renderInventory(hero); };
           }
           invGrid.appendChild(slot);
@@ -251,7 +276,33 @@ function drawWeather(dt) {
         }
       });
       cvs.addEventListener('contextmenu', e => { e.preventDefault(); if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; } });
-      window.addEventListener('keydown', e => { const k = e.key.toLowerCase(); input.keys[k] = true; if (k === 'f') globalThis.fogEnabled = !globalThis.fogEnabled; if (k === '1') tryCast(1); if (k === '2') tryCast(2); if (k === '3') tryCast(3); if (k === 'u') { const h = players[0].hero; if (h && h.inventory.length) { const it = h.inventory.shift(); applyItem(h, it); renderInventory(h); } } if (k === 'r') { resumeWorkers(players[0]); } });
+      window.addEventListener('keydown', e => {
+        const k = e.key.toLowerCase();
+        input.keys[k] = true;
+        const hk = INV_KEYS.indexOf(k);
+        if (hk !== -1) {
+          const h = players[0].hero;
+          if (h && h.inventory[hk]) {
+            applyItem(h, h.inventory[hk]);
+            h.inventory.splice(hk, 1);
+            renderInventory(h);
+            return;
+          }
+        }
+        if (k === 'f') globalThis.fogEnabled = !globalThis.fogEnabled;
+        if (k === '1') tryCast(1);
+        if (k === '2') tryCast(2);
+        if (k === '3') tryCast(3);
+        if (k === 'u') {
+          const h = players[0].hero;
+          if (h && h.inventory.length) {
+            const it = h.inventory.shift();
+            applyItem(h, it);
+            renderInventory(h);
+          }
+        }
+        if (k === 'r') { resumeWorkers(players[0]); }
+      });
       window.addEventListener('keyup', e => { input.keys[e.key.toLowerCase()] = false; });
 
       function entityAt(wx, wy) {
@@ -328,12 +379,22 @@ function drawWeather(dt) {
       const unitPanel = document.getElementById('unitPanel'), buildingPanel = document.getElementById('buildingPanel'), workerBuild = document.getElementById('workerBuild');
       function updateBuildingPanel() {
         const selected = players[0].structures.filter(s => s.selected && !s.isGhost && s.owner === 0); if (selected.length !== 1) { buildingPanel.style.display = 'none'; buildingPanel.innerHTML = ''; return; } const b = selected[0]; buildingPanel.style.display = 'flex'; buildingPanel.innerHTML = '';
-        function add(label, cb) { const btn = document.createElement('button'); btn.className = 'btn'; btn.textContent = label; btn.onclick = () => { cb(); }; buildingPanel.appendChild(btn); }
-        if (b.kind === 'hq') { add('Рабочий (🍚50/💧12)', () => b.queue.push('worker')); }
-        if (b.kind === 'barracks') { add('Мечник (🍚60/💧24)', () => b.queue.push('soldier')); }
-        if (b.kind === 'mBarracks') { add('Маг (🍚80/💧46)', () => b.queue.push('mage')); }
-        if (b.kind === 'range') { add('Лучник (🍚70/💧36)', () => b.queue.push('archer')); }
-        if (b.kind === 'altar') { add('Возродить героя', () => { const P = players[0]; if (!P.hero || P.hero.dead) { setTimeout(() => spawnHero(0, b.x + 40, b.y - 20, P.chosenClass), 20000); } }); }
+        function add(label, cost, cb) {
+          const btn = document.createElement('button');
+          btn.className = 'btn'; btn.textContent = label;
+          btn.onclick = () => {
+            const R = players[0].res;
+            if (cost && (R.rice < cost.rice || R.water < cost.water)) {
+              if (!muted) beep(80, 0.1, 'sine', 0.05);
+            } else { cb(); }
+          };
+          buildingPanel.appendChild(btn);
+        }
+        if (b.kind === 'hq') { add('Рабочий (🍚50/💧12)', { rice: 50, water: 12 }, () => b.queue.push('worker')); }
+        if (b.kind === 'barracks') { add('Мечник (🍚60/💧24)', { rice: 60, water: 24 }, () => b.queue.push('soldier')); }
+        if (b.kind === 'mBarracks') { add('Маг (🍚80/💧46)', { rice: 80, water: 46 }, () => b.queue.push('mage')); }
+        if (b.kind === 'range') { add('Лучник (🍚70/💧36)', { rice: 70, water: 36 }, () => b.queue.push('archer')); }
+        if (b.kind === 'altar') { add('Возродить героя', { rice: 0, water: 0 }, () => { const P = players[0]; if ((!P.hero || P.hero.dead) && !b.queue.includes('hero')) { b.queue.push('hero'); } }); }
       }
       function renderWorkerBuildPanel() {
         const selected = players[0].units.filter(u => u.selected && u.type === 'worker'); if (selected.length === 0) { workerBuild.style.display = 'none'; workerBuild.innerHTML = ''; return; } workerBuild.style.display = 'flex'; workerBuild.innerHTML = '';
@@ -363,11 +424,13 @@ function drawWeather(dt) {
               abilityDesc.textContent = 'Маг: наносит урон с расстояния и поддерживает союзников.';
             }
           } else if (e instanceof Structure) {
-            t = 'Здание: ' + e.kind;
+            const names = { square: 'Площадь' };
+            t = 'Здание: ' + (names[e.kind] || e.kind);
             extra = `HP: ${(e.hp | 0)}/${(e.maxHp | 0)}\nOwner: ${owner}`;
           } else {
-            t = 'Нейтрал';
-            extra = `HP: ${(e.hp | 0)}/${(e.maxHp | 0)}\nTier: ${e.tier}`;
+            t = 'Нейтрал: ' + (e.name || '');
+            const dropName = ITEM_NAMES[e.drop] || e.drop;
+            extra = `HP: ${(e.hp | 0)}/${(e.maxHp | 0)}\nTier: ${e.tier}\nDrop: ${dropName}`;
           }
           statsPanel.textContent = t + '\n' + extra;
         } else {
@@ -398,7 +461,7 @@ function drawWeather(dt) {
       }
 
       /* ==== Utils ==== */
-Object.assign(globalThis, { players, neutral, drops, projectiles, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes, placeGhost, trainUnit, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel, updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, getById, enemiesFor, Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, input, setHeroUI });
+      Object.assign(globalThis, { players, neutral, drops, projectiles, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes, placeGhost, trainUnit, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel, updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, getById, enemiesFor, Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, input, setHeroUI, spawnHero });
 
       await import("./ui.js");
 await import("./terrain.js");
@@ -416,6 +479,7 @@ await import("./ai.js");
         const pos = [{ x: 900, y: 900 }, { x: world.width - 1200, y: 1200 }, { x: world.width - 1800, y: world.height - 1400 }];
         const playerClass = await chooseHeroClass();
         for (let i = 0; i < 3; i++) {
+          players[i].startX = pos[i].x; players[i].startY = pos[i].y;
           const HQ = new Structure(pos[i].x, pos[i].y, i, 'hq', false); players[i].structures.push(HQ);
           for (let k = 0; k < 6; k++) { const w = new Unit(HQ.x + (k % 3) * 24, HQ.y + 60 + Math.floor(k / 3) * 24, i, 'worker'); players[i].units.push(w); w.role = (k % 2 === 0) ? 'rice' : 'water'; }
           const cls = (i === 0 ? playerClass : (Math.random() < 0.34 ? 'paladin' : (Math.random() < 0.67 ? 'rogue' : 'archmage')));
@@ -458,7 +522,7 @@ globalThis.drawHp = drawHp;
           const sp = 900 / world.zoom; if (input.keys['w'] || input.keys['ц']) world.camY -= sp * dt; if (input.keys['s'] || input.keys['ы']) world.camY += sp * dt; if (input.keys['a'] || input.keys['ф']) world.camX -= sp * dt; if (input.keys['d'] || input.keys['в']) world.camX += sp * dt; clampCam();
           for (const p of players) { for (const s of p.structures) s.update(dt); for (const u of p.units) u.update(dt); if (p.ai) aiThink(dt, players.indexOf(p)); }
           for (const n of neutral.units) { n.update(dt); if (n.dead && !n.awarded) { if (n.lastHitBy != null && n.lastHitBy >= 0) { heroGainFromNeutral(n.lastHitBy, n.tier); }
-            if (n.group && n.group.dropsLeft > 0) { drops.push(new ItemDrop(n.x, n.y, lootFromTier(n.tier))); n.group.dropsLeft--; }
+            if (n.group && n.group.dropsLeft > 0) { drops.push(new ItemDrop(n.x, n.y, n.drop)); n.group.dropsLeft--; }
             n.awarded = true; } }
           for (let i = neutral.units.length - 1; i >= 0; i--) { if (neutral.units[i].dead && neutral.units[i].awarded) { neutral.units.splice(i, 1); } }
           for (const pr of projectiles) pr.update(dt);
@@ -489,6 +553,14 @@ globalThis.drawHp = drawHp;
         for (const pr of projectiles) pr.draw();
         drawWeather(dt);
         drawFog();
+        if (input.buildMode) {
+          const res = canPlace(0, input.wx, input.wy, input.buildMode);
+          const ok = res === 'ok';
+          const s = worldToScreen(input.wx, input.wy);
+          const size = 72 * world.zoom;
+          ctx.strokeStyle = ok ? 'rgba(0,255,0,0.6)' : 'rgba(255,0,0,0.6)';
+          ctx.strokeRect(s.x - size / 2, s.y - size / 2, size, size);
+        }
         if (input.rectSelecting) {
           const rx = Math.min(input.rectStartX, input.x);
           const ry = Math.min(input.rectStartY, input.y);
@@ -514,9 +586,33 @@ globalThis.drawHp = drawHp;
         if (k === 't') startBuild('well');
         if (k === 'l') startBuild('range');
         if (k === 'h') startBuild('altar');
-        if (k === 'q') { const b = players[0].structures.find(s => s.kind === 'barracks' && !s.isGhost && s.owner === 0 && s.selected); if (b) b.queue.push('soldier'); }
-        if (k === 'w') { const b = players[0].structures.find(s => s.kind === 'range' && !s.isGhost && s.owner === 0 && s.selected); if (b) b.queue.push('archer'); }
-        if (k === 'e') { const b = players[0].structures.find(s => s.kind === 'mBarracks' && !s.isGhost && s.owner === 0 && s.selected); if (b) b.queue.push('mage'); }
+        if (k === 'q') {
+          const b = players[0].structures.find(s => s.kind === 'barracks' && !s.isGhost && s.owner === 0 && s.selected);
+          if (b) {
+            const cost = { rice: 60, water: 24 };
+            const R = players[0].res;
+            if (R.rice < cost.rice || R.water < cost.water) { if (!muted) beep(80, 0.1, 'sine', 0.05); }
+            else b.queue.push('soldier');
+          }
+        }
+        if (k === 'w') {
+          const b = players[0].structures.find(s => s.kind === 'range' && !s.isGhost && s.owner === 0 && s.selected);
+          if (b) {
+            const cost = { rice: 70, water: 36 };
+            const R = players[0].res;
+            if (R.rice < cost.rice || R.water < cost.water) { if (!muted) beep(80, 0.1, 'sine', 0.05); }
+            else b.queue.push('archer');
+          }
+        }
+        if (k === 'e') {
+          const b = players[0].structures.find(s => s.kind === 'mBarracks' && !s.isGhost && s.owner === 0 && s.selected);
+          if (b) {
+            const cost = { rice: 80, water: 46 };
+            const R = players[0].res;
+            if (R.rice < cost.rice || R.water < cost.water) { if (!muted) beep(80, 0.1, 'sine', 0.05); }
+            else b.queue.push('mage');
+          }
+        }
       });
 
       function startBuild(kind) { input.buildMode = kind; document.getElementById('buildTip').style.display = 'block'; }

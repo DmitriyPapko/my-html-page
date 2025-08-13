@@ -102,7 +102,7 @@ export class Unit extends Entity {
   updateWorker(dt) {
     if (this.role !== 'rice' && this.role !== 'water') return;
     const P = globalThis.players[this.owner];
-    const HQ = P.structures.find(s => s.kind === 'hq');
+    const HQ = P.structures.find(s => s.kind === 'hq' || s.kind === 'square');
     if (!HQ) { this.state = 'idle'; this.noteTimer = 2; return; }
     const node = (this.role === 'rice' ? nearestNode('rice', P) : nearestNode('water', P));
     if (!node) { this.state = 'idle'; this.noteTimer = 2; this.nodeId = null; return; }
@@ -156,7 +156,7 @@ export class Unit extends Entity {
   }
   updateRetreat(dt) {
     if (this.owner !== 0 && !this.isHero) {
-      const HQ = globalThis.players[this.owner].structures.find(s => s.kind === 'hq');
+      const HQ = globalThis.players[this.owner].structures.find(s => s.kind === 'hq' || s.kind === 'square');
       if (this.hp / this.maxHp < 0.35) {
         this.retreat = true;
         if (HQ) this.setDest(HQ.x, HQ.y + 40);
@@ -240,33 +240,77 @@ export class Unit extends Entity {
   draw() {
     if (this.owner !== 0 && !globalThis.isVisible(this.x, this.y)) return;
     const s = globalThis.worldToScreen(this.x, this.y);
+    const zoom = globalThis.world.zoom;
+    const ctx = globalThis.ctx;
     const col = globalThis.players[this.owner]?.color || '#9fb2a1';
-    const spr = this.isHero ? 'hero' : (this.type === 'archer' ? 'archer' : (this.type === 'mage' ? 'mage' : 'soldier'));
-    globalThis.drawShadow(s.x, s.y + 12 * globalThis.world.zoom, 12 * globalThis.world.zoom);
-    globalThis.drawSprite(spr, s.x, s.y, globalThis.world.zoom * 1.25, { o: col });
-    globalThis.drawHp(s.x, s.y - 18 * globalThis.world.zoom, this.hp / this.maxHp);
+    globalThis.drawShadow(s.x, s.y + 12 * zoom, 12 * zoom);
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.scale(zoom, zoom);
+    const grad = ctx.createLinearGradient(0, -12, 0, 12);
+    grad.addColorStop(0, '#f0f0f0');
+    grad.addColorStop(1, '#bdbdbd');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, -8, 8, Math.PI, 0);
+    ctx.lineTo(8, 8);
+    ctx.arc(0, 8, 8, 0, Math.PI);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = col;
+    ctx.fillRect(-8, -2, 16, 4);
+    if (this.type === 'soldier') {
+      ctx.fillStyle = '#ccc';
+      ctx.fillRect(-14, -2, 6, 4);
+      ctx.fillRect(-14, -6, 2, 12);
+    }
+    if (this.type === 'archer') {
+      ctx.strokeStyle = '#ccc';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(14, 0, 6, -0.8, 0.8);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+    if (this.type === 'mage') {
+      ctx.strokeStyle = '#8ad';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-12, -8);
+      ctx.lineTo(-12, 12);
+      ctx.stroke();
+      ctx.fillStyle = '#8ad';
+      ctx.beginPath();
+      ctx.arc(-12, -12, 3, 0, 6.283);
+      ctx.fill();
+      ctx.lineWidth = 1;
+    }
+    ctx.restore();
+    if (this.owner === 0 || this.selected) {
+      globalThis.drawHp(s.x, s.y - 18 * zoom, this.hp / this.maxHp);
+    }
     if (this.auraTimer > 0) {
-      globalThis.ctx.strokeStyle = 'rgba(255,215,0,0.5)';
-      globalThis.ctx.beginPath();
-      globalThis.ctx.arc(s.x, s.y, 80 * globalThis.world.zoom, 0, 6.283);
-      globalThis.ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,215,0,0.5)';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 80 * zoom, 0, 6.283);
+      ctx.stroke();
     }
     if (this.isHero) {
-      globalThis.ctx.strokeStyle = '#ffd27a';
-      globalThis.ctx.beginPath();
-      globalThis.ctx.arc(s.x, s.y, 14 * globalThis.world.zoom, 0, 6.283);
-      globalThis.ctx.stroke();
+      ctx.strokeStyle = '#ffd27a';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 14 * zoom, 0, 6.283);
+      ctx.stroke();
     }
     if (this.selected) {
-      globalThis.ctx.strokeStyle = '#7ac8ff';
-      globalThis.ctx.beginPath();
-      globalThis.ctx.arc(s.x, s.y, 16 * globalThis.world.zoom, 0, 6.283);
-      globalThis.ctx.stroke();
+      ctx.strokeStyle = '#7ac8ff';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 16 * zoom, 0, 6.283);
+      ctx.stroke();
     }
     if (this.noteTimer > 0 && this.type === 'worker') {
-      globalThis.ctx.fillStyle = '#ffd27a';
-      globalThis.ctx.font = `${12 * globalThis.world.zoom}px sans-serif`;
-      globalThis.ctx.fillText('!', s.x - 3 * globalThis.world.zoom, s.y - 20 * globalThis.world.zoom);
+      ctx.fillStyle = '#ffd27a';
+      ctx.font = `${12 * zoom}px sans-serif`;
+      ctx.fillText('!', s.x - 3 * zoom, s.y - 20 * zoom);
     }
   }
 }
@@ -289,15 +333,22 @@ export class Structure extends Entity {
       return;
     }
     if (this.queue.length > 0) {
-      if (this.qTime <= 0) this.qTime = 2.0;
+      if (this.qTime <= 0) this.qTime = this.queue[0] === 'hero' ? 20.0 : 2.0;
       this.qTime -= dt;
       if (this.qTime <= 0) {
-        const u = this.queue[0];
-        if (globalThis.trainUnit(this.owner, this, u)) {
-          this.queue.shift();
+        const u = this.queue.shift();
+        if (u === 'hero') {
+          if (!globalThis.players[this.owner].hero || globalThis.players[this.owner].hero.dead) {
+            globalThis.spawnHero(this.owner, this.x + 40, this.y - 20, globalThis.players[this.owner].chosenClass);
+          }
           this.qTime = 0;
         } else {
-          this.qTime = 1.0;
+          if (globalThis.trainUnit(this.owner, this, u)) {
+            this.qTime = 0;
+          } else {
+            this.qTime = 1.0;
+            this.queue.unshift(u);
+          }
         }
       }
     }
@@ -310,10 +361,54 @@ export class Structure extends Entity {
     const w = 16 * scale;
     globalThis.drawShadow(s.x, s.y + w / 2, w / 2);
     globalThis.drawSprite('building', s.x, s.y, scale, { o: col });
-    globalThis.drawHp(s.x, s.y - w / 2 - 10, this.hp / this.maxHp);
+    // flag
+    const ctx = globalThis.ctx;
+    const poleH = 20 * globalThis.world.zoom;
+    const poleX = s.x + w / 2 - 4 * globalThis.world.zoom;
+    const poleY = s.y - w / 2;
+    ctx.strokeStyle = '#555';
+    ctx.lineWidth = 2 * globalThis.world.zoom;
+    ctx.beginPath();
+    ctx.moveTo(poleX, poleY);
+    ctx.lineTo(poleX, poleY - poleH);
+    ctx.stroke();
+    const t = performance.now() / 300;
+    const flagW = 12 * globalThis.world.zoom;
+    const flagH = 8 * globalThis.world.zoom;
+    const wave = Math.sin(t) * 2 * globalThis.world.zoom;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(poleX, poleY - poleH + 2 * globalThis.world.zoom);
+    ctx.lineTo(poleX + flagW, poleY - poleH + 2 * globalThis.world.zoom + wave);
+    ctx.lineTo(poleX + flagW, poleY - poleH + 2 * globalThis.world.zoom + flagH + wave);
+    ctx.lineTo(poleX, poleY - poleH + 2 * globalThis.world.zoom + flagH);
+    ctx.closePath();
+    ctx.fill();
+    if (this.owner === 0 || this.selected) {
+      globalThis.drawHp(s.x, s.y - w / 2 - 10, this.hp / this.maxHp);
+    }
     if (this.selected) {
       globalThis.ctx.strokeStyle = '#7ac8ff';
       globalThis.ctx.strokeRect(s.x - w / 2 - 4, s.y - w / 2 - 4, w + 8, w + 8);
+    }
+    if (this.owner === 0 && this.queue.length > 0) {
+      const ctx = globalThis.ctx;
+      const zoom = globalThis.world.zoom;
+      const barY = s.y + w / 2 + 6 * zoom;
+      const total = this.queue[0] === 'hero' ? 20.0 : 2.0;
+      const prog = globalThis.clamp(1 - this.qTime / total, 0, 1);
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(s.x - w / 2, barY, w, 4 * zoom);
+      ctx.fillStyle = '#6be36b';
+      ctx.fillRect(s.x - w / 2, barY, w * prog, 4 * zoom);
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.strokeRect(s.x - w / 2, barY, w, 4 * zoom);
+      ctx.fillStyle = '#fff';
+      ctx.font = `${10 * zoom}px sans-serif`;
+      ctx.fillText(this.qTime.toFixed(1), s.x - w / 2, barY - 2 * zoom);
+      if (this.queue.length > 1) {
+        ctx.fillText('+' + (this.queue.length - 1), s.x + w / 2 + 4 * zoom, barY + 3 * zoom);
+      }
     }
   }
 }
@@ -383,6 +478,8 @@ export class NeutralCreep extends Entity {
   constructor(x, y, kind = 'beast') {
     super(x, y, -1);
     this.kind = kind;
+    const names = { mage: 'Ворожей', gnome: 'Гном', troll: 'Тролль', beast: 'Зверь' };
+    this.name = names[kind] || 'Нейтрал';
     if (kind === 'mage') { this.maxHp = 140; this.dps = 24; this.attackRange = 260; this.leash = 340; this.tier = 1; }
     else if (kind === 'gnome') { this.maxHp = 220; this.dps = 22; this.attackRange = 50; this.leash = 360; this.block = 0.25; this.tier = 2; }
     else if (kind === 'troll') { this.maxHp = 500; this.dps = 40; this.attackRange = 40; this.leash = 380; this.tier = 3; }
@@ -397,6 +494,7 @@ export class NeutralCreep extends Entity {
     this.awarded = false;
     this.regen = 0.2;
     this.baseSpeed = 80;
+    this.drop = lootFromTier(this.tier);
   }
   damage(n, killerOwner = null) {
     if (this.kind === 'gnome' && Math.random() < 0.25) n *= 0.5;
@@ -434,14 +532,71 @@ export class NeutralCreep extends Entity {
     }
   }
   draw() {
-    if (!globalThis.isExplored(this.x, this.y)) return;
+    if (!globalThis.isVisible(this.x, this.y)) return;
     const s = globalThis.worldToScreen(this.x, this.y);
-    let col = '#9fb2a1';
-    if (this.kind === 'mage') col = '#8ad';
-    else if (this.kind === 'gnome') col = '#b86';
-    else if (this.kind === 'troll') col = '#a44';
-    globalThis.drawSprite('unit', s.x, s.y, globalThis.world.zoom * 1.25, { o: col });
-    globalThis.drawHp(s.x, s.y - 18 * globalThis.world.zoom, this.hp / this.maxHp);
+    const ctx = globalThis.ctx;
+    const zoom = globalThis.world.zoom;
+    let band = '#9fb2a1';
+    if (this.kind === 'mage') band = '#8ad';
+    else if (this.kind === 'gnome') band = '#b86';
+    else if (this.kind === 'troll') band = '#a44';
+    globalThis.drawShadow(s.x, s.y + 12 * zoom, 12 * zoom);
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.scale(zoom, zoom);
+    const grad = ctx.createLinearGradient(0, -12, 0, 12);
+    grad.addColorStop(0, '#f0f0f0');
+    grad.addColorStop(1, '#bdbdbd');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, -8, 8, Math.PI, 0);
+    ctx.lineTo(8, 8);
+    ctx.arc(0, 8, 8, 0, Math.PI);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = band;
+    ctx.fillRect(-8, -2, 16, 4);
+    if (this.kind === 'mage') {
+      ctx.strokeStyle = '#8ad';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-12, -8);
+      ctx.lineTo(-12, 12);
+      ctx.stroke();
+      ctx.fillStyle = '#8ad';
+      ctx.beginPath();
+      ctx.arc(-12, -12, 3, 0, 6.283);
+      ctx.fill();
+      ctx.lineWidth = 1;
+    } else if (this.kind === 'gnome') {
+      ctx.fillStyle = '#b86';
+      ctx.beginPath();
+      ctx.moveTo(0, -12);
+      ctx.lineTo(-4, -20);
+      ctx.lineTo(4, -20);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#b86';
+      ctx.beginPath();
+      ctx.moveTo(12, -4);
+      ctx.lineTo(6, 4);
+      ctx.lineTo(14, 8);
+      ctx.stroke();
+    } else if (this.kind === 'troll') {
+      ctx.fillStyle = '#a44';
+      ctx.fillRect(-10, -14, 4, 4);
+      ctx.fillRect(6, -4, 4, 12);
+      ctx.fillStyle = '#654';
+      ctx.fillRect(10, -2, 6, 4);
+    } else if (this.kind === 'beast') {
+      ctx.fillStyle = '#555';
+      ctx.fillRect(-6, -16, 4, 4);
+      ctx.fillRect(2, -16, 4, 4);
+    }
+    ctx.restore();
+    if (this.selected) {
+      globalThis.drawHp(s.x, s.y - 18 * zoom, this.hp / this.maxHp);
+    }
   }
 }
 
@@ -475,10 +630,11 @@ export function allStructures() {
 
 export function nearestNode(type, P) {
   const arr = (type === 'rice' ? globalThis.riceNodes : globalThis.waterNodes);
-  if (!P.structures || P.structures.length === 0) return null;
+  const base = P.structures.find(s => s.kind === 'hq' || s.kind === 'square');
+  if (!base) return null;
   let best = null, bd = 1e9;
   for (const n of arr) {
-    const d = globalThis.dist2(P.structures[0].x, P.structures[0].y, n.x, n.y);
+    const d = globalThis.dist2(base.x, base.y, n.x, n.y);
     if (d < bd) { bd = d; best = n; }
   }
   return best;
