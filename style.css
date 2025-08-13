@@ -174,14 +174,28 @@
       z-index: 85
     }
 
-    #heroSelect {
+    .overlay {
       position: fixed;
       inset: 0;
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: center;
-      background: rgba(0, 0, 0, .65);
-      z-index: 95
+      background: radial-gradient(1200px 600px at 50% 0%, rgba(60, 90, 130, .25), rgba(0, 0, 0, .85));
+    }
+
+    .card {
+      background: rgba(0, 0, 0, .6);
+      padding: 22px 26px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, .1);
+    }
+
+    #heroSelect {
+      z-index: 100;
+    }
+    #heroSelect .card {
+      text-align: center;
+      max-width: 600px;
     }
 
     .heroChoice {
@@ -199,38 +213,19 @@
     }
 
     #menu {
-      position: fixed;
-      inset: 0;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      background: radial-gradient(1200px 600px at 50% 0%, rgba(60, 90, 130, .25), rgba(0, 0, 0, .85));
-      z-index: 100
+      z-index: 100;
     }
 
     #menu .card {
-      background: rgba(0, 0, 0, .6);
-      padding: 22px 26px;
-      border-radius: 16px;
-      border: 1px solid rgba(255, 255, 255, .1);
-      max-width: 900px
+      max-width: 900px;
     }
 
     #resultMenu {
-      position: fixed;
-      inset: 0;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      background: radial-gradient(1200px 600px at 50% 0%, rgba(60, 90, 130, .25), rgba(0, 0, 0, .85));
-      z-index: 110
+      z-index: 110;
     }
 
     #resultMenu .card {
-      background: rgba(0, 0, 0, .6);
-      padding: 22px 26px;
-      border-radius: 16px;
-      border: 1px solid rgba(255, 255, 255, .1);
       max-width: 600px;
-      text-align: center
+      text-align: center;
     }
