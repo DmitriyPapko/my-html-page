@@ -83,7 +83,6 @@ export class Unit extends Entity {
     this.regen = 0.25;
     this.auraTimer = 0;
     this.buildTargetId = null;
-    this.xpGiven = false;
   }
   setDest(x, y) {
     this.destX = x;
@@ -268,7 +267,6 @@ export class Structure extends Entity {
     this.qTime = 0;
     this.vision = 520;
     this.regen = 0.3;
-    this.xpGiven = false;
   }
   update(dt) {
     if (this.isGhost) {
