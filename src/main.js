@@ -1,3 +1,4 @@
+import "./sprites.js";
 import { Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, getById, enemiesFor, allUnits, allStructures, nearestNode, lootFromTier } from "./entities.js";
 
 /* ==== Helpers ==== */

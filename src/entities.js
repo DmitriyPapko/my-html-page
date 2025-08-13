@@ -201,14 +201,8 @@ export class Unit extends Entity {
   draw() {
     if (this.owner !== 0 && !globalThis.isVisible(this.x, this.y)) return;
     const s = globalThis.worldToScreen(this.x, this.y);
-    let col = '#6bb0ff';
-    if (this.owner === 1) col = '#e05dff';
-    if (this.owner === 2) col = '#ffd27a';
-    if (this.owner === -1) col = '#9fb2a1';
-    globalThis.ctx.fillStyle = col;
-    globalThis.ctx.beginPath();
-    globalThis.ctx.arc(s.x, s.y, 10 * globalThis.world.zoom, 0, 6.283);
-    globalThis.ctx.fill();
+    const col = globalThis.players[this.owner]?.color || '#9fb2a1';
+    globalThis.drawSprite('unit', s.x, s.y, globalThis.world.zoom * 1.25, { o: col });
     globalThis.drawHp(s.x, s.y - 18 * globalThis.world.zoom, this.hp / this.maxHp);
     if (this.isHero) {
       globalThis.ctx.strokeStyle = '#ffd27a';
@@ -261,9 +255,10 @@ export class Structure extends Entity {
   draw() {
     if (this.owner !== 0 && !globalThis.isVisible(this.x, this.y)) return;
     const s = globalThis.worldToScreen(this.x, this.y);
-    globalThis.ctx.fillStyle = this.kind === 'hq' ? '#6f8' : this.kind === 'barracks' ? '#f86' : this.kind === 'range' ? '#cfa' : this.kind === 'mBarracks' ? '#9bf' : '#acf';
-    const w = 84 * globalThis.world.zoom;
-    globalThis.ctx.fillRect(s.x - w / 2, s.y - w / 2, w, w);
+    const col = globalThis.players[this.owner]?.color || '#9fb2a1';
+    const scale = globalThis.world.zoom * 5.25;
+    const w = 16 * scale;
+    globalThis.drawSprite('building', s.x, s.y, scale, { o: col });
     globalThis.drawHp(s.x, s.y - w / 2 - 10, this.hp / this.maxHp);
     if (this.selected) {
       globalThis.ctx.strokeStyle = '#7ac8ff';
@@ -283,18 +278,8 @@ export class ResourceNode {
   draw() {
     if (!globalThis.isExplored(this.x, this.y)) return;
     const s = globalThis.worldToScreen(this.x, this.y);
-    const r = this.radius * globalThis.world.zoom;
-    if (this.type === 'rice') {
-      globalThis.ctx.fillStyle = '#2a4e2a';
-      globalThis.ctx.beginPath();
-      globalThis.ctx.arc(s.x, s.y, r, 0, 6.283);
-      globalThis.ctx.fill();
-    } else {
-      globalThis.ctx.fillStyle = '#1a4e6e';
-      globalThis.ctx.beginPath();
-      globalThis.ctx.arc(s.x, s.y, r, 0, 6.283);
-      globalThis.ctx.fill();
-    }
+    const scale = globalThis.world.zoom * (this.radius * 2 / 16);
+    globalThis.drawSprite(this.type === 'rice' ? 'rice' : 'water', s.x, s.y, scale);
   }
 }
 
@@ -308,10 +293,8 @@ export class ItemDrop extends Entity {
     if (!globalThis.isExplored(this.x, this.y)) return;
     const s = globalThis.worldToScreen(this.x, this.y);
     const map = { scroll_hp: 'HP', scroll_dps: 'DPS', ring_atk: 'Ring', boots: 'Boots', amulet: 'Amul', orb: 'Orb' };
-    globalThis.ctx.fillStyle = (this.kind === 'scroll_hp') ? '#7cff97' : (this.kind === 'scroll_dps' ? '#ffd27a' : '#8ad');
-    globalThis.ctx.beginPath();
-    globalThis.ctx.arc(s.x, s.y - 10, 10 * globalThis.world.zoom, 0, 6.283);
-    globalThis.ctx.fill();
+    const col = (this.kind === 'scroll_hp') ? '#7cff97' : (this.kind === 'scroll_dps' ? '#ffd27a' : '#8ad');
+    globalThis.drawSprite('item', s.x, s.y - 10 * globalThis.world.zoom, globalThis.world.zoom * 1.25, { r: col, R: col });
     globalThis.ctx.fillStyle = '#000';
     globalThis.ctx.font = `${12 * globalThis.world.zoom}px system-ui`;
     globalThis.ctx.fillText(map[this.kind] || this.kind, s.x - 16 * globalThis.world.zoom, s.y + 14 * globalThis.world.zoom);
@@ -371,10 +354,8 @@ export class NeutralCreep extends Entity {
   draw() {
     if (!globalThis.isExplored(this.x, this.y)) return;
     const s = globalThis.worldToScreen(this.x, this.y);
-    globalThis.ctx.fillStyle = this.tier >= 3 ? '#b86' : (this.tier == 2 ? '#a68' : '#9fb2a1');
-    globalThis.ctx.beginPath();
-    globalThis.ctx.arc(s.x, s.y, 12 * globalThis.world.zoom, 0, 6.283);
-    globalThis.ctx.fill();
+    const col = this.tier >= 3 ? '#b86' : (this.tier === 2 ? '#a68' : '#9fb2a1');
+    globalThis.drawSprite('unit', s.x, s.y, globalThis.world.zoom * 1.25, { o: col });
     globalThis.drawHp(s.x, s.y - 18 * globalThis.world.zoom, this.hp / this.maxHp);
   }
 }
