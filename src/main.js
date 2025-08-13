@@ -1,4 +1,4 @@
-import { drawSprite, toPixel, drawShadow } from "./sprites.js";
+import "./sprites.js";
 import { Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, getById, enemiesFor, allUnits, allStructures, nearestNode, lootFromTier } from "./entities.js";
 
 /* ==== Helpers ==== */
@@ -31,7 +31,7 @@ cvs.addEventListener('wheel', e => {
   clampCam();
 }, { passive: false });
 
-Object.assign(globalThis, { clamp, rand, dist2, cvs, ctx, mini, mctx, DPR, world, screenToWorld, worldToScreen, clampCam, drawSprite, toPixel, drawShadow });
+Object.assign(globalThis, { clamp, rand, dist2, cvs, ctx, mini, mctx, DPR, world, screenToWorld, worldToScreen, clampCam });
 
 /* ==== Audio (простые огибающие без внешних файлов) ==== */
 const AC = window.AudioContext ? new AudioContext() : null;
@@ -240,10 +240,10 @@ function drawWeather(dt) {
 
       /* ==== Input & selection ==== */
       const buildTip = document.getElementById('buildTip');
-      const input = { x: 0, y: 0, wx: 0, wy: 0, keys: {}, buildMode: null, lastClickT: 0, lastClickType: null, lDown: false, rectStartX: 0, rectStartY: 0, rectStartWX: 0, rectStartWY: 0, rectSelecting: false };
+      const input = { x: 0, y: 0, wx: 0, wy: 0, keys: {}, buildMode: null, lastClickT: 0, lastClickType: null, rDown: false, rectStartX: 0, rectStartY: 0, rectStartWX: 0, rectStartWY: 0, rectSelecting: false };
       cvs.addEventListener('mousemove', e => {
         input.x = e.offsetX; input.y = e.offsetY; const w = screenToWorld(input.x, input.y); input.wx = w.x; input.wy = w.y;
-        if (input.lDown && !input.rectSelecting) {
+        if (input.rDown && !input.rectSelecting) {
           if (Math.abs(e.offsetX - input.rectStartX) > 4 || Math.abs(e.offsetY - input.rectStartY) > 4) input.rectSelecting = true;
         }
       });
@@ -264,8 +264,18 @@ function drawWeather(dt) {
 
       cvs.addEventListener('mousedown', e => {
         if (e.button === 0) {
+          const now = performance.now();
           if (input.buildMode) { const ok = placeGhost(0, input.wx, input.wy, input.buildMode); if (ok) { input.buildMode = null; buildTip.style.display = 'none'; } return; }
-          input.lDown = true;
+          const hit = entityAt(input.wx, input.wy);
+          if (!e.shiftKey) unselectAll();
+          if (hit) {
+            hit.selected = true;
+            if (now - input.lastClickT < 300 && input.lastClickType === hit.type) { selectSameTypeOnScreen(hit.type); }
+            input.lastClickType = hit.type; input.lastClickT = now;
+          }
+          updatePanels();
+        } else if (e.button === 2) {
+          input.rDown = true;
           input.rectStartX = e.offsetX;
           input.rectStartY = e.offsetY;
           input.rectStartWX = input.wx;
@@ -274,47 +284,35 @@ function drawWeather(dt) {
       });
 
       cvs.addEventListener('mouseup', e => {
-        if (e.button === 0) {
+        if (e.button === 2) {
+          e.preventDefault();
           if (input.rectSelecting) {
             const x1 = Math.min(input.rectStartWX, input.wx), y1 = Math.min(input.rectStartWY, input.wy);
             const x2 = Math.max(input.rectStartWX, input.wx), y2 = Math.max(input.rectStartWY, input.wy);
-            const newly = [];
+            if (!e.shiftKey) unselectAll();
             for (const u of players[0].units) {
               if (u.dead) continue;
-              if (u.x >= x1 && u.x <= x2 && u.y >= y1 && u.y <= y2) newly.push(u);
+              if (u.x >= x1 && u.x <= x2 && u.y >= y1 && u.y <= y2) u.selected = true;
             }
-            if (newly.length) {
-              if (!e.shiftKey) unselectAll();
-              newly.forEach(u => u.selected = true);
-              updatePanels();
-            }
+            updatePanels();
           } else {
-            const hit = entityAt(input.wx, input.wy);
-            const now = performance.now();
-            if (hit) {
-              if (!e.shiftKey) unselectAll();
-              hit.selected = true;
-              if (now - input.lastClickT < 300 && input.lastClickType === hit.type) { selectSameTypeOnScreen(hit.type); }
-              input.lastClickType = hit.type; input.lastClickT = now;
-              updatePanels();
+            if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; input.rDown = false; return; }
+            const sel = players[0].units.filter(u => u.selected && !u.dead);
+            const tgt = entityAt(input.wx, input.wy);
+            if (sel.length === 0 && tgt && tgt.owner === 0) {
+              unselectAll(); tgt.selected = true; updatePanels(); input.rDown = false; return;
+            }
+            if (sel.length) {
+              if (tgt instanceof Structure && tgt.isGhost && sel.some(u => u.type === 'worker')) {
+                sel.filter(u => u.type === 'worker').forEach(w => { w.state = 'build'; w.buildTargetId = tgt.id; });
+              } else if (tgt instanceof ResourceNode && sel.some(u => u.type === 'worker')) {
+                sel.filter(u => u.type === 'worker').forEach(w => { w.role = tgt.type; w.state = 'idle'; });
+              } else if (tgt && tgt.owner !== 0) { sel.forEach(u => u.setTarget(tgt)); }
+              else { sel.forEach((u, i) => u.setDest(input.wx + i * 12, input.wy)); }
             }
           }
-          input.lDown = false;
+          input.rDown = false;
           input.rectSelecting = false;
-        } else if (e.button === 2) {
-          e.preventDefault();
-          if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; return; }
-          const sel = players[0].units.filter(u => u.selected && !u.dead);
-          const tgt = entityAt(input.wx, input.wy);
-          if (sel.length === 0 && tgt && tgt.owner === 0) { unselectAll(); tgt.selected = true; updatePanels(); return; }
-          if (sel.length) {
-            if (tgt instanceof Structure && tgt.isGhost && sel.some(u => u.type === 'worker')) {
-              sel.filter(u => u.type === 'worker').forEach(w => { w.state = 'build'; w.buildTargetId = tgt.id; });
-            } else if (tgt instanceof ResourceNode && sel.some(u => u.type === 'worker')) {
-              sel.filter(u => u.type === 'worker').forEach(w => { w.role = tgt.type; w.state = 'idle'; });
-            } else if (tgt && tgt.owner !== 0) { sel.forEach(u => u.setTarget(tgt)); }
-            else { sel.forEach((u, i) => u.setDest(input.wx + i * 12, input.wy)); }
-          }
         }
       });
 
@@ -372,31 +370,11 @@ function drawWeather(dt) {
 
       /* ==== Minimap ==== */
       mini.addEventListener('click', e => { const r = mini.getBoundingClientRect(); const mx = (e.clientX - r.left) / r.width, my = (e.clientY - r.top) / r.height; world.camX = mx * world.width - (cvs.width / DPR) / world.zoom / 2; world.camY = my * world.height - (cvs.height / DPR) / world.zoom / 2; });
-      let miniBg = null;
-      function genMiniBg() {
-        miniBg = mctx.createImageData(mini.width, mini.height);
-        for (let y = 0; y < mini.height; y++) {
-          for (let x = 0; x < mini.width; x++) {
-            const idx = (y * mini.width + x) * 4;
-            let n = (Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1; if (n < 0) n += 1;
-            const g = 90 + n * 80;
-            const r = 40 + n * 40;
-            miniBg.data[idx] = r;
-            miniBg.data[idx + 1] = g;
-            miniBg.data[idx + 2] = 40;
-            miniBg.data[idx + 3] = 255;
-          }
-        }
-      }
       function drawMinimap() {
-        if (!miniBg) genMiniBg();
-        mctx.putImageData(miniBg, 0, 0);
-        function dot(x, y, col, size = 1) { mctx.fillStyle = col; mctx.fillRect(Math.round(x - size / 2), Math.round(y - size / 2), size, size); }
-        for (const p of players) {
-          for (const s of p.structures) { if (!isExplored(s.x, s.y)) continue; dot(s.x / world.width * mini.width, s.y / world.height * mini.height, p.color, 2); }
-          for (const u of p.units) { if (!isExplored(u.x, u.y)) continue; dot(u.x / world.width * mini.width, u.y / world.height * mini.height, p.color, 1); }
-        }
-        for (const n of neutral.units) { if (!isExplored(n.x, n.y)) continue; dot(n.x / world.width * mini.width, n.y / world.height * mini.height, '#9fb2a1', 1); }
+        const img = mctx.createImageData(mini.width, mini.height); for (let y = 0; y < mini.height; y++) { for (let x = 0; x < mini.width; x++) { const idx = (y * mini.width + x) * 4; img.data[idx] = 0; img.data[idx + 1] = 60; img.data[idx + 2] = 10; img.data[idx + 3] = 255; } } mctx.putImageData(img, 0, 0);
+        function dot(x, y, col) { mctx.fillStyle = col; mctx.fillRect(x - 1, y - 1, 2, 2); }
+        for (const p of players) { for (const s of p.structures) { if (!isExplored(s.x, s.y)) continue; dot(s.x / world.width * mini.width, s.y / world.height * mini.height, p.color); } for (const u of p.units) { if (!isExplored(u.x, u.y)) continue; dot(u.x / world.width * mini.width, u.y / world.height * mini.height, p.color); } }
+        for (const n of neutral.units) { if (!isExplored(n.x, n.y)) continue; dot(n.x / world.width * mini.width, n.y / world.height * mini.height, '#9fb2a1'); }
         mctx.strokeStyle = 'rgba(255,255,255,.8)'; mctx.lineWidth = 1; const rx = world.camX / world.width * mini.width, ry = world.camY / world.height * mini.height; const rw = (cvs.width / DPR) / world.zoom / world.width * mini.width, rh = (cvs.height / DPR) / world.zoom / world.height * mini.height; mctx.strokeRect(rx, ry, rw, rh);
       }
 
@@ -452,7 +430,7 @@ globalThis.resetGame = resetGame;
 
       /* ==== Loop ==== */
       let last = performance.now();
-      function drawHp(x, y, k) { k = clamp(k, 0, 1); x = toPixel(x); y = toPixel(y); ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(x - 18, y - 4, 36, 6); ctx.fillStyle = k > .5 ? '#6be36b' : (k > .25 ? '#ffd36b' : '#ff6b6b'); ctx.fillRect(x - 18, y - 4, 36 * k, 6); ctx.strokeStyle = 'rgba(255,255,255,.15)'; ctx.strokeRect(x - 18, y - 4, 36, 6); }
+      function drawHp(x, y, k) { k = clamp(k, 0, 1); ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(x - 18, y - 4, 36, 6); ctx.fillStyle = k > .5 ? '#6be36b' : (k > .25 ? '#ffd36b' : '#ff6b6b'); ctx.fillRect(x - 18, y - 4, 36 * k, 6); ctx.strokeStyle = 'rgba(255,255,255,.15)'; ctx.strokeRect(x - 18, y - 4, 36, 6); }
 globalThis.drawHp = drawHp;
       function loop(t) {
         const dt = Math.min(0.033, (t - last) / 1000); last = t; simTime += dt;
@@ -484,13 +462,8 @@ globalThis.drawHp = drawHp;
         }
         ctx.clearRect(0, 0, cvs.width, cvs.height);
         drawTerrain();
-        drawBlockers();
-        for (const r of riceNodes) r.draw();
-        for (const w of waterNodes) w.draw();
-        const actors = allStructures().concat(allUnits(), neutral.units, drops);
-        actors.sort((a, b) => a.y - b.y);
-        for (const e of actors) { if (e.draw) e.draw(); }
-        for (const p of projectiles) { p.draw(); }
+        const drawables = allStructures().concat(allUnits(), neutral.units, projectiles, riceNodes, waterNodes, drops); drawables.sort((a, b) => a.y - b.y);
+        for (const e of drawables) { if (e.draw) e.draw(); }
         drawWeather(dt);
         drawFog();
         if (input.rectSelecting) {

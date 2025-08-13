@@ -1,6 +1,4 @@
 /* ==== Entities ==== */
-import { drawSprite, drawShadow, toPixel } from './sprites.js';
-
 let nextId = 1;
 
 function moveEntity(e, dx, dy, v, dt) {
@@ -244,30 +242,30 @@ export class Unit extends Entity {
     const s = globalThis.worldToScreen(this.x, this.y);
     const col = globalThis.players[this.owner]?.color || '#9fb2a1';
     const spr = this.isHero ? 'hero' : (this.type === 'archer' ? 'archer' : (this.type === 'mage' ? 'mage' : 'soldier'));
-    drawSprite(globalThis.ctx, spr, s.x, s.y, { scale: globalThis.world.zoom * 1.25, shadow: true, override: { o: col } });
-    globalThis.drawHp(toPixel(s.x), toPixel(s.y - 18 * globalThis.world.zoom), this.hp / this.maxHp);
+    globalThis.drawSprite(spr, s.x, s.y, globalThis.world.zoom * 1.25, { o: col });
+    globalThis.drawHp(s.x, s.y - 18 * globalThis.world.zoom, this.hp / this.maxHp);
     if (this.auraTimer > 0) {
       globalThis.ctx.strokeStyle = 'rgba(255,215,0,0.5)';
       globalThis.ctx.beginPath();
-      globalThis.ctx.arc(toPixel(s.x), toPixel(s.y), 80 * globalThis.world.zoom, 0, 6.283);
+      globalThis.ctx.arc(s.x, s.y, 80 * globalThis.world.zoom, 0, 6.283);
       globalThis.ctx.stroke();
     }
     if (this.isHero) {
       globalThis.ctx.strokeStyle = '#ffd27a';
       globalThis.ctx.beginPath();
-      globalThis.ctx.arc(toPixel(s.x), toPixel(s.y), 14 * globalThis.world.zoom, 0, 6.283);
+      globalThis.ctx.arc(s.x, s.y, 14 * globalThis.world.zoom, 0, 6.283);
       globalThis.ctx.stroke();
     }
     if (this.selected) {
       globalThis.ctx.strokeStyle = '#7ac8ff';
       globalThis.ctx.beginPath();
-      globalThis.ctx.arc(toPixel(s.x), toPixel(s.y), 16 * globalThis.world.zoom, 0, 6.283);
+      globalThis.ctx.arc(s.x, s.y, 16 * globalThis.world.zoom, 0, 6.283);
       globalThis.ctx.stroke();
     }
     if (this.noteTimer > 0 && this.type === 'worker') {
       globalThis.ctx.fillStyle = '#ffd27a';
       globalThis.ctx.font = `${12 * globalThis.world.zoom}px sans-serif`;
-      globalThis.ctx.fillText('!', toPixel(s.x - 3 * globalThis.world.zoom), toPixel(s.y - 20 * globalThis.world.zoom));
+      globalThis.ctx.fillText('!', s.x - 3 * globalThis.world.zoom, s.y - 20 * globalThis.world.zoom);
     }
   }
 }
@@ -309,11 +307,11 @@ export class Structure extends Entity {
     const col = globalThis.players[this.owner]?.color || '#9fb2a1';
     const scale = globalThis.world.zoom * 5.25;
     const w = 16 * scale;
-    drawSprite(globalThis.ctx, 'building', s.x, s.y, { scale, shadow: true, override: { o: col } });
-    globalThis.drawHp(toPixel(s.x), toPixel(s.y - w / 2 - 10), this.hp / this.maxHp);
+    globalThis.drawSprite('building', s.x, s.y, scale, { o: col });
+    globalThis.drawHp(s.x, s.y - w / 2 - 10, this.hp / this.maxHp);
     if (this.selected) {
       globalThis.ctx.strokeStyle = '#7ac8ff';
-      globalThis.ctx.strokeRect(toPixel(s.x - w / 2 - 4), toPixel(s.y - w / 2 - 4), w + 8, w + 8);
+      globalThis.ctx.strokeRect(s.x - w / 2 - 4, s.y - w / 2 - 4, w + 8, w + 8);
     }
   }
 }
@@ -330,7 +328,7 @@ export class ResourceNode {
     if (!globalThis.isExplored(this.x, this.y)) return;
     const s = globalThis.worldToScreen(this.x, this.y);
     const scale = globalThis.world.zoom * (this.radius * 2 / 16);
-    drawSprite(globalThis.ctx, this.type === 'rice' ? 'rice' : 'waterNode', s.x, s.y, { scale, shadow: true });
+    globalThis.drawSprite(this.type === 'rice' ? 'rice' : 'water', s.x, s.y, scale);
   }
 }
 
@@ -345,10 +343,10 @@ export class ItemDrop extends Entity {
     const s = globalThis.worldToScreen(this.x, this.y);
     const map = { scroll_hp: 'HP', scroll_dps: 'DPS', ring_atk: 'Mana', boots: 'Boots', amulet: 'Amul', orb: 'Orb' };
     const col = (this.kind === 'scroll_hp') ? '#7cff97' : (this.kind === 'scroll_dps' ? '#ffd27a' : '#8ad');
-    drawSprite(globalThis.ctx, 'item', s.x, s.y - 10 * globalThis.world.zoom, { scale: globalThis.world.zoom * 1.25, override: { r: col, R: col } });
+    globalThis.drawSprite('item', s.x, s.y - 10 * globalThis.world.zoom, globalThis.world.zoom * 1.25, { r: col, R: col });
     globalThis.ctx.fillStyle = '#000';
     globalThis.ctx.font = `${12 * globalThis.world.zoom}px system-ui`;
-    globalThis.ctx.fillText(map[this.kind] || this.kind, toPixel(s.x - 16 * globalThis.world.zoom), toPixel(s.y + 14 * globalThis.world.zoom));
+    globalThis.ctx.fillText(map[this.kind] || this.kind, s.x - 16 * globalThis.world.zoom, s.y + 14 * globalThis.world.zoom);
   }
 }
 
@@ -373,7 +371,7 @@ export class Projectile extends Entity {
     const s = globalThis.worldToScreen(this.x, this.y);
     globalThis.ctx.fillStyle = '#ffd27a';
     globalThis.ctx.beginPath();
-    globalThis.ctx.arc(toPixel(s.x), toPixel(s.y), 3 * globalThis.world.zoom, 0, 6.283);
+    globalThis.ctx.arc(s.x, s.y, 3 * globalThis.world.zoom, 0, 6.283);
     globalThis.ctx.fill();
   }
 }
@@ -439,8 +437,8 @@ export class NeutralCreep extends Entity {
     if (this.kind === 'mage') col = '#8ad';
     else if (this.kind === 'gnome') col = '#b86';
     else if (this.kind === 'troll') col = '#a44';
-    drawSprite(globalThis.ctx, 'unit', s.x, s.y, { scale: globalThis.world.zoom * 1.25, shadow: true, override: { o: col } });
-    globalThis.drawHp(toPixel(s.x), toPixel(s.y - 18 * globalThis.world.zoom), this.hp / this.maxHp);
+    globalThis.drawSprite('unit', s.x, s.y, globalThis.world.zoom * 1.25, { o: col });
+    globalThis.drawHp(s.x, s.y - 18 * globalThis.world.zoom, this.hp / this.maxHp);
   }
 }
 
