@@ -1,3 +1,5 @@
+import { Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, getById, enemiesFor, allUnits, allStructures, nearestNode, lootFromTier } from "./entities.js";
+
 /* ==== Helpers ==== */
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -24,91 +26,7 @@ function beep(freq = 440, dur = 0.08, type = 'triangle', gain = 0.06) {
   o.start(); g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + dur); o.stop(AC.currentTime + dur);
 }
 globalThis.beep = beep;
-
-      /* ==== Entities ==== */
-      let nextId = 1, simTime = 0;
-      class Entity { constructor(x, y, owner = -1) { this.id = nextId++; this.x = x; this.y = y; this.owner = owner; this.hp = 100; this.maxHp = 100; this.dead = false; this.selected = false; this.radius = 16; this.lastHitBy = null; this.regen = 0; this.shield = 0; } damage(n, killerOwner = null) { if (n <= 0) return; const take = Math.min(this.shield, n); this.shield -= take; n -= take; if (n > 0) { this.hp -= n; if (killerOwner != null) this.lastHitBy = killerOwner; if (this.hp <= 0) { this.hp = 0; this.dead = true; this.onDeath && this.onDeath(this.lastHitBy); } } } }
-      class Unit extends Entity {
-        constructor(x, y, owner, type = 'worker') { super(x, y, owner); this.type = type; this.radius = 12; this.speed = 190; this.baseSpeed = 190; this.destX = x; this.destY = y; this.attackRange = 28; this.attackCd = 0; this.dps = 22; this.vision = 480; this.isHero = false; this.mp = 0; this.maxMp = 0; this.cd1 = 0; this.cd2 = 0; this.cd3 = 0; this.cdM1 = 8; this.cdM2 = 12; this.cdM3 = 20; this.heroClass = null; this.levelStacks = 0; this.inventory = []; this.targetId = null; this.role = null; this.state = 'idle'; this.workTimer = 0; this.carry = 0; this.speedBuff = 0; this.slow = 0; this.summonTimer = 0; this.retreat = false; this.regen = 0.25; }
-        setDest(x, y) { this.destX = x; this.destY = y; this.state = 'move'; this.targetId = null; }
-        setTarget(e) { this.targetId = e ? e.id : null; this.state = e ? 'fight' : 'move'; }
-        getCurrentSpeed() { return this.speed * (this.speedBuff ? 1.5 : 1.0) * (this.slow ? 0.6 : 1.0); }
-        updateWorker(dt) {
-          if (this.role !== 'rice' && this.role !== 'water') return;
-          const P = players[this.owner]; const HQ = P.structures.find(s => s.kind === 'hq');
-          const node = (this.role === 'rice' ? nearestNode('rice', P) : nearestNode('water', P));
-          if (!HQ || !node) return;
-          if (this.state === 'idle') { this.state = 'to_node'; this.destX = node.x + rand(-24, 24); this.destY = node.y + rand(-24, 24); }
-          if (this.state === 'to_node') { const dx = this.destX - this.x, dy = this.destY - this.y, d = Math.hypot(dx, dy); if (d > 2) { const v = this.getCurrentSpeed(); const nx = this.x + dx / d * v * dt, ny = this.y + dy / d * v * dt; if (!isBlocked(nx, ny)) { this.x = nx; this.y = ny; } } else { this.state = 'harvest'; this.workTimer = (this.role === 'rice' ? 2.2 : 2.6); } }
-          if (this.state === 'harvest') { this.workTimer -= dt; if (this.workTimer <= 0) { this.carry = (this.role === 'rice' ? 12 : 9); this.state = 'to_hq'; this.destX = HQ.x + rand(-32, 32); this.destY = HQ.y + rand(-32, 32); } }
-          if (this.state === 'to_hq') { const dx = this.destX - this.x, dy = this.destY - this.y, d = Math.hypot(dx, dy); if (d > 2) { const v = this.getCurrentSpeed(); const nx = this.x + dx / d * v * dt, ny = this.y + dy / d * v * dt; if (!isBlocked(nx, ny)) { this.x = nx; this.y = ny; } } else { if (this.carry > 0) { if (this.role === 'rice') P.res.rice += this.carry; else P.res.water += this.carry; if (this.owner === 0) updateRes(); this.carry = 0; } this.state = 'to_node'; this.destX = node.x + rand(-24, 24); this.destY = node.y + rand(-24, 24); } }
-        }
-        updateRetreat(dt) {
-          if (this.owner !== 0 && !this.isHero) {
-            const HQ = players[this.owner].structures.find(s => s.kind === 'hq');
-            if (this.hp / this.maxHp < 0.35) { this.retreat = true; if (HQ) this.setDest(HQ.x, HQ.y + 40); }
-            else if (this.hp / this.maxHp > 0.8) { this.retreat = false; }
-          }
-        }
-        updateCombat(dt, target) {
-          const dx = target.x - this.x, dy = target.y - this.y; const d = Math.hypot(dx, dy);
-          if (d > this.attackRange) { const v = this.getCurrentSpeed(); const nx = this.x + dx / d * v * dt, ny = this.y + dy / d * v * dt; if (!isBlocked(nx, ny)) { this.x = nx; this.y = ny; } }
-          else { this.attackCd -= dt; if (this.attackCd <= 0) { this.attackCd = .55; target.damage(this.dps, this.owner); if (!muted) beep(220 + this.dps, 0.05, 'square', 0.03); } }
-        }
-        updateMovement(dt) {
-          const dx = this.destX - this.x, dy = this.destY - this.y; const d = Math.hypot(dx, dy);
-          if (d > 2) { const v = this.getCurrentSpeed(); const nx = this.x + dx / d * v * dt, ny = this.y + dy / d * v * dt; if (!isBlocked(nx, ny)) { this.x = nx; this.y = ny; } }
-        }
-        update(dt) {
-          if (this.dead) return;
-          if (this.hp < this.maxHp) { this.hp = Math.min(this.maxHp, this.hp + this.regen * dt * 60); }
-          this.cd1 = Math.max(0, this.cd1 - dt); this.cd2 = Math.max(0, this.cd2 - dt); this.cd3 = Math.max(0, this.cd3 - dt);
-          if (this.speedBuff > 0) { this.speedBuff = Math.max(0, this.speedBuff - dt); }
-          if (this.slow > 0) { this.slow = Math.max(0, this.slow - dt); }
-          if (this.summonTimer > 0) { this.summonTimer -= dt; if (this.summonTimer <= 0) { this.dead = true; } }
-          if (this.type === 'worker' && !this.isHero) { this.updateWorker(dt); return; }
-          this.updateRetreat(dt);
-          const target = getById(this.targetId);
-          if (target && !target.dead && !this.retreat) { this.updateCombat(dt, target); }
-          else { this.updateMovement(dt); }
-          // auto-acquire target (агр рядом)
-          if (!this.isHero) { const enemies = enemiesFor(this.owner); let best = null, bd = 1e9; for (const e of enemies) { if (e.dead) continue; const d = dist2(this.x, this.y, e.x, e.y); if (d < bd && d <= this.vision * this.vision) { bd = d; best = e; } } if (best) { this.setTarget(best); } }
-        }
-        draw() {
-          if (this.owner !== 0 && !isVisible(this.x, this.y)) return;
-          const s = worldToScreen(this.x, this.y);
-          let col = '#6bb0ff'; if (this.owner === 1) col = '#e05dff'; if (this.owner === 2) col = '#ffd27a'; if (this.owner === -1) col = '#9fb2a1';
-          ctx.fillStyle = col; ctx.beginPath(); ctx.arc(s.x, s.y, 10 * world.zoom, 0, 6.283); ctx.fill();
-          drawHp(s.x, s.y - 18 * world.zoom, this.hp / this.maxHp);
-          if (this.isHero) { ctx.strokeStyle = '#ffd27a'; ctx.beginPath(); ctx.arc(s.x, s.y, 14 * world.zoom, 0, 6.283); ctx.stroke(); }
-          if (this.selected) { ctx.strokeStyle = '#7ac8ff'; ctx.beginPath(); ctx.arc(s.x, s.y, 16 * world.zoom, 0, 6.283); ctx.stroke(); }
-        }
-      }
-      class Structure extends Entity {
-        constructor(x, y, owner, kind = 'hq', ghost = false) { super(x, y, owner); this.kind = kind; this.isGhost = ghost; this.radius = 36; this.maxHp = ghost ? 200 : 520; this.hp = ghost ? 40 : 520; this.queue = []; this.qTime = 0; this.vision = 520; this.regen = 0.3; }
-        update(dt) {
-          if (this.isGhost) { this.hp = Math.min(this.maxHp, this.hp + 15 * dt); if (this.hp >= this.maxHp) this.isGhost = false; return; }
-          if (this.queue.length > 0) { if (this.qTime <= 0) this.qTime = 2.0; this.qTime -= dt; if (this.qTime <= 0) { const u = this.queue[0]; if (trainUnit(this.owner, this, u)) { this.queue.shift(); this.qTime = 0; } else { this.qTime = 1.0; } } }
-        }
-        draw() { if (this.owner !== 0 && !isVisible(this.x, this.y)) return; const s = worldToScreen(this.x, this.y); ctx.fillStyle = this.kind === 'hq' ? '#6f8' : this.kind === 'barracks' ? '#f86' : this.kind === 'range' ? '#cfa' : this.kind === 'mBarracks' ? '#9bf' : '#acf'; const w = 84 * world.zoom; ctx.fillRect(s.x - w / 2, s.y - w / 2, w, w); drawHp(s.x, s.y - w / 2 - 10, this.hp / this.maxHp); if (this.selected) { ctx.strokeStyle = '#7ac8ff'; ctx.strokeRect(s.x - w / 2 - 4, s.y - w / 2 - 4, w + 8, w + 8); } }
-      }
-      class ResourceNode { constructor(x, y, type = 'rice') { this.id = nextId++; this.x = x; this.y = y; this.type = type; this.radius = 44; } draw() { if (!isExplored(this.x, this.y)) return; const s = worldToScreen(this.x, this.y); const r = this.radius * world.zoom; if (this.type === 'rice') { ctx.fillStyle = '#2a4e2a'; ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, 6.283); ctx.fill(); } else { ctx.fillStyle = '#1a4e6e'; ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, 6.283); ctx.fill(); } } }
-      class ItemDrop extends Entity { constructor(x, y, kind = 'scroll_dps') { super(x, y, -1); this.kind = kind; this.radius = 14; } draw() { if (!isExplored(this.x, this.y)) return; const s = worldToScreen(this.x, this.y); const map = { scroll_hp: 'HP', scroll_dps: 'DPS', ring_atk: 'Ring', boots: 'Boots', amulet: 'Amul', orb: 'Orb' }; ctx.fillStyle = (this.kind === 'scroll_hp') ? '#7cff97' : (this.kind === 'scroll_dps' ? '#ffd27a' : '#8ad'); ctx.beginPath(); ctx.arc(s.x, s.y - 10, 10 * world.zoom, 0, 6.283); ctx.fill(); ctx.fillStyle = '#000'; ctx.font = `${12 * world.zoom}px system-ui`; ctx.fillText(map[this.kind] || this.kind, s.x - 16 * world.zoom, s.y + 14 * world.zoom); } }
-
-      /* ==== Neutrals ==== */
-      class NeutralCreep extends Entity {
-        constructor(x, y, tier = 1) { super(x, y, -1); this.tier = tier; this.radius = 12 + 4 * (tier - 1); this.maxHp = 160 + 140 * (tier - 1); this.hp = this.maxHp; this.dps = 18 + 10 * (tier - 1); this.attackRange = 26 + 6 * (tier - 1); this.leash = 320 + 60 * (tier - 1); this.homeX = x; this.homeY = y; this.aggro = false; this.attackCd = 0; this.vision = 280 + 40 * (tier - 1); this.awarded = false; this.regen = 0.2; }
-        update(dt) {
-          if (this.dead) return;
-          let tgt = null, bd = 1e9; const candidates = players[0].units.concat(players[1].units, players[2].units);
-          for (const u of candidates) { if (u.dead) continue; const d = dist2(this.x, this.y, u.x, u.y); if (d < bd) { bd = d; tgt = u; } }
-          const md = Math.sqrt(bd);
-          if (!this.aggro && md < this.leash) this.aggro = true;
-          if (this.aggro && tgt && md < this.leash * 1.2) { if (md > this.attackRange) { const ux = (tgt.x - this.x) / md, uy = (tgt.y - this.y) / md; const nx = this.x + ux * 80 * dt, ny = this.y + uy * 80 * dt; if (!isBlocked(nx, ny)) { this.x = nx; this.y = ny; } } else { this.attackCd -= dt; if (this.attackCd <= 0) { this.attackCd = .65; tgt.damage(this.dps, -1); } } }
-          else { const dx = this.homeX - this.x, dy = this.homeY - this.y, d = Math.hypot(dx, dy); if (d > 2) { const nx = this.x + dx / d * 60 * dt, ny = this.y + dy / d * 60 * dt; if (!isBlocked(nx, ny)) { this.x = nx; this.y = ny; } } this.aggro = false; }
-        }
-        draw() { if (!isExplored(this.x, this.y)) return; const s = worldToScreen(this.x, this.y); ctx.fillStyle = this.tier >= 3 ? '#b86' : (this.tier == 2 ? '#a68' : '#9fb2a1'); ctx.beginPath(); ctx.arc(s.x, s.y, 12 * world.zoom, 0, 6.283); ctx.fill(); drawHp(s.x, s.y - 18 * world.zoom, this.hp / this.maxHp); }
-      }
+let simTime = 0;
       const neutral = { units: [] }, drops = [];
 
       /* ==== Players & economy ==== */
@@ -121,10 +39,6 @@ globalThis.beep = beep;
       const resUI = { rice: document.getElementById('resRice'), water: document.getElementById('resWater'), pop: document.getElementById('pop') };
       const POP_CAP = 20;
       function updateRes() { resUI.rice.textContent = players[0].res.rice | 0; resUI.water.textContent = players[0].res.water | 0; resUI.pop.textContent = players[0].units.filter(u => !u.dead && !u.isHero).length; }
-
-      /* ==== ID lookup ==== */
-      function getById(id) { if (!id) return null; for (const p of players) { for (const u of p.units) { if (u.id === id) return u; } for (const s of p.structures) { if (s.id === id) return s; } } for (const n of neutral.units) { if (n.id === id) return n; } return null; }
-      function enemiesFor(owner) { const arr = []; for (const p of players) { if (p === players[owner]) continue; arr.push(...p.units.filter(u => !u.dead), ...p.structures.filter(s => !s.isGhost)); } arr.push(...neutral.units); return arr; }
 
       /* ==== Training & buildings ==== */
       const COSTS = { barracks: { rice: 180, water: 70 }, mBarracks: { rice: 220, water: 110 }, well: { rice: 140, water: 0 }, range: { rice: 160, water: 80 }, altar: { rice: 200, water: 140 } };
@@ -279,11 +193,7 @@ globalThis.beep = beep;
       }
 
       /* ==== Utils ==== */
-      function allUnits() { return players[0].units.concat(players[1].units, players[2].units); }
-      function allStructures() { return players[0].structures.concat(players[1].structures, players[2].structures); }
-      function nearestNode(type, P) { const arr = (type === 'rice' ? riceNodes : waterNodes); let best = null, bd = 1e9; for (const n of arr) { const d = dist2(P.structures[0].x, P.structures[0].y, n.x, n.y); if (d < bd) { bd = d; best = n; } } return best; }
-      function lootFromTier(t) { const base = ['scroll_hp', 'scroll_dps']; const rare = ['ring_atk', 'boots', 'amulet', 'orb']; return (Math.random() < 0.6 ? base[Math.random() < 0.5 ? 0 : 1] : rare[(Math.random() * rare.length) | 0]); }
-Object.assign(globalThis, { players, neutral, drops, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes, placeGhost, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel, updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, input });
+Object.assign(globalThis, { players, neutral, drops, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes, placeGhost, trainUnit, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel, updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, getById, enemiesFor, Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, input });
 
       await import("./ui.js");
 await import("./terrain.js");
@@ -319,6 +229,7 @@ globalThis.resetGame = resetGame;
       /* ==== Loop ==== */
       let last = performance.now();
       function drawHp(x, y, k) { k = clamp(k, 0, 1); ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(x - 18, y - 4, 36, 6); ctx.fillStyle = k > .5 ? '#6be36b' : (k > .25 ? '#ffd36b' : '#ff6b6b'); ctx.fillRect(x - 18, y - 4, 36 * k, 6); ctx.strokeStyle = 'rgba(255,255,255,.15)'; ctx.strokeRect(x - 18, y - 4, 36, 6); }
+globalThis.drawHp = drawHp;
       function loop(t) {
         const dt = Math.min(0.033, (t - last) / 1000); last = t; simTime += dt;
         clearVisible(); for (const s of players[0].structures) revealCircle(s.x, s.y, 520); for (const u of players[0].units) revealCircle(u.x, u.y, 480);
