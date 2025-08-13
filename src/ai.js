@@ -42,7 +42,7 @@ function aiThink(dt, id) {
     const kind = P.aiPlan.open[P.aiPlan.nextBuild]; const cost = COSTS[kind];
     if (P.res.rice >= cost.rice && P.res.water >= cost.water) {
       const dx = (kind === 'well') ? -160 : (Math.random() < 0.5 ? 180 : -180), dy = (kind === 'well') ? 120 : (Math.random() < 0.5 ? 160 : -160);
-      const px = HQ.x + dx, py = HQ.y + dy; if (!isBlocked(px, py) && placeGhost(id, px, py, kind)) { P.aiPlan.nextBuild++; }
+      const px = HQ.x + dx, py = HQ.y + dy; if (!isBlocked(px, py) && placeGhost(id, px, py, kind)) { P.aiPlan.nextBuild++; const g = P.structures.find(s => s.isGhost && s.kind === kind && Math.hypot(s.x - px, s.y - py) < 10); const w = P.units.find(u => u.type === 'worker'); if (g && w) { w.state = 'build'; w.buildTargetId = g.id; } }
     }
   }
   // maintain 6 workers
@@ -79,6 +79,11 @@ function aiThink(dt, id) {
     const enemyHero = players[0].hero && !players[0].hero.dead ? players[0].hero : null;
     const tgt = enemyHero || players[0].structures.find(s => !s.isGhost) || players[0].units.find(u => !u.isHero);
     if (tgt) { army.forEach(u => { if (!u.retreat) u.setTarget(tgt); }); }
+  }
+  const ghost = P.structures.find(s => s.isGhost);
+  if (ghost) {
+    const w = P.units.find(u => u.type === 'worker' && u.state !== 'build');
+    if (w) { w.state = 'build'; w.buildTargetId = ghost.id; }
   }
 }
 function nearestNeutralCamp(P, neutral, dist2) {
