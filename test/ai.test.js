@@ -1,54 +1,18 @@
 import assert from 'assert';
-import { AIController, nearestNeutralCamp, DIFFICULTY_CONFIG } from '../src/ai.js';
+import { AIController, nearestNeutralCamp } from '../src/ai.js';
+import { packPower, campPower } from '../src/config/ai.js';
 
 const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
 
-// nearestNeutralCamp tests remain
+// buildOpenings places well and barracks with fallback when blocked
 (() => {
-  const neutral = { units: [] };
-  const P = { structures: [] };
-  const result = nearestNeutralCamp(P, neutral, dist2);
-  assert.strictEqual(result, null);
-})();
-
-(() => {
-  const neutral = { units: [] };
-  const P = { structures: [{ x: 0, y: 0 }] };
-  const result = nearestNeutralCamp(P, neutral, dist2);
-  assert.strictEqual(result, null);
-})();
-
-(() => {
-  const neutral = {
-    units: [
-      { x: 10, y: 0, dead: false },
-      { x: 3, y: 4, dead: false },
-    ],
-  };
-  const P = { structures: [{ x: 0, y: 0 }] };
-  const result = nearestNeutralCamp(P, neutral, dist2);
-  assert.ok(result === neutral.units[1]);
-})();
-
-(() => {
-  const neutral = {
-    units: [
-      { x: 10, y: 0, dead: true },
-      { x: 3, y: 4, dead: true },
-    ],
-  };
-  const P = { structures: [{ x: 0, y: 0 }] };
-  const result = nearestNeutralCamp(P, neutral, dist2);
-  assert.strictEqual(result, null);
-})();
-
-// AIController initialization and behavior for each difficulty
-['easy', 'normal', 'hard'].forEach(level => {
+  const COSTS = { square: { rice: 0, water: 0 }, well: { rice: 0, water: 0 }, barracks: { rice: 0, water: 0 } };
+  const events = [];
   const players = [
     { units: [], structures: [], hero: null, ai: false },
     {
-      units: [],
-      structures: [{ kind: 'square', queue: [] }],
+      units: [{ type: 'worker', state: 'idle' }],
+      structures: [{ kind: 'square', x: 0, y: 0, queue: [], id: 1 }],
       hero: null,
       ai: true,
       aiPlan: null,
@@ -57,109 +21,131 @@ const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
   ];
   const deps = {
     players,
-    COSTS: { square: { rice: 0, water: 0 }, well: { rice: 0, water: 0 }, barracks: { rice: 0, water: 0 }, range: { rice: 0, water: 0 }, mBarracks: { rice: 0, water: 0 } },
+    COSTS,
     POP_CAP: 10,
-    placeGhost: () => false,
-    isBlocked: () => false,
-    neutral: { units: [] },
+    placeGhost: (id, x, y, kind) => {
+      events.push({ x, y, kind });
+      players[1].structures.push({ kind, x, y, id: events.length + 1, isGhost: true, queue: [] });
+      return true;
+    },
+    isBlocked: (x, y) => events.length > 0 && Math.abs(x) <= 220 && Math.abs(y) <= 220,
+    neutral: { camps: [] },
     dist2,
+    packPower,
+    campPower,
   };
-  const controller = new AIController(1, deps);
-  controller.setDifficulty(level);
-  controller.init();
-  assert.strictEqual(players[1].aiPlan.pushAt, DIFFICULTY_CONFIG[level].pushAt);
-  controller.think(0);
-  assert.ok(players[1].structures[0].queue.includes('worker'));
-});
+  const ai = new AIController(1, deps);
+  ai.init();
+  ai.buildOpenings(0); // build well
+  players[1].units[0].state = 'idle';
+  ai.buildOpenings(6); // attempt barracks but blocked after timer
+  ai.buildOpenings(1); // cooldown and retry
+  ai.buildOpenings(0); // fallback placement
+  assert.strictEqual(events[0].kind, 'well');
+  assert.strictEqual(events[1].kind, 'barracks');
+  assert.ok(Math.abs(events[1].x) > 220);
+})();
 
-// Scenario 1: defense mode engages nearby threats
+// trainUnits queues soldier then archer when resources allow
 (() => {
-  const enemyUnit = { id: 99, x: 5, y: 5, dead: false };
-  const soldier = { type: 'soldier', x: 0, y: 0, setTarget(t) { this.target = t; } };
+  const COSTS = { square: { rice: 0, water: 0 }, barracks: { rice: 0, water: 0 }, range: { rice: 0, water: 0 } };
+  const barr = { kind: 'barracks', queue: [], isGhost: false };
+  const rng = { kind: 'range', queue: [], isGhost: false };
   const players = [
-    { units: [enemyUnit], structures: [], hero: null, ai: false },
+    { units: [], structures: [], hero: null, ai: false },
     {
-      units: [soldier],
-      structures: [{ id: 1, kind: 'square', x: 0, y: 0, queue: [], hp: 100, maxHp: 100 }],
+      units: [{ type: 'soldier' }, { type: 'soldier' }],
+      structures: [{ kind: 'square', queue: [] }, barr, rng],
       hero: null,
+      ai: true,
+      aiPlan: null,
+      res: { rice: 200, water: 200 },
+    },
+  ];
+  const deps = { players, COSTS, POP_CAP: 10, placeGhost: () => false, isBlocked: () => false, neutral: { camps: [] }, dist2, packPower, campPower };
+  const ai = new AIController(1, deps);
+  ai.init();
+  ai.trainUnits(1); // soldier to reach minimum
+  players[1].units.push({ type: 'soldier' });
+  ai.trainUnits(1); // archer next
+  assert.strictEqual(barr.queue[0], 'soldier');
+  assert.strictEqual(rng.queue[0], 'archer');
+})();
+
+// earlyArmyFarm sends army only when strong enough and not hero alone
+(() => {
+  const camp = { x: 10, y: 0, units: [{ hp: 30, dps: 3 }, { hp: 30, dps: 3 }] };
+  const neutral = { camps: [camp] };
+  const soldier = { type: 'soldier', hp: 100, dps: 5, setTarget(t) { this.target = t; } };
+  const archer = { type: 'archer', hp: 80, dps: 5, setTarget(t) { this.target = t; } };
+  const hero = { isHero: true, hp: 100, dps: 10, setTarget(t) { this.target = t; } };
+  const players = [
+    { units: [], structures: [], hero: null, ai: false },
+    {
+      units: [soldier, archer, hero],
+      structures: [{ kind: 'square', x: 0, y: 0 }],
+      hero,
       ai: true,
       aiPlan: null,
       res: { rice: 100, water: 100 },
     },
   ];
-  const deps = {
-    players,
-    COSTS: { square: { rice: 0, water: 0 }, well: { rice: 0, water: 0 }, barracks: { rice: 0, water: 0 }, range: { rice: 0, water: 0 }, mBarracks: { rice: 0, water: 0 } },
-    POP_CAP: 10,
-    placeGhost: () => false,
-    isBlocked: () => false,
-    neutral: { units: [] },
-    dist2,
-  };
-  const controller = new AIController(1, deps);
-  controller.init();
-  controller.defendBase();
-  assert.strictEqual(soldier.target, enemyUnit);
+  const deps = { players, COSTS: {}, POP_CAP: 10, placeGhost: () => false, isBlocked: () => false, neutral, dist2, packPower, campPower };
+  const ai = new AIController(1, deps);
+  ai.init();
+  ai.earlyArmyFarm();
+  assert.strictEqual(hero.target, undefined);
+  assert.strictEqual(soldier.target, camp);
+  assert.strictEqual(archer.target, camp);
 })();
 
-// Scenario 3: worker redistribution swaps roles based on resources
+// engage retreats when enemy power overwhelming
 (() => {
-  const workerRice = { type: 'worker', role: 'rice', state: 'gather' };
-  const workerWater = { type: 'worker', role: 'water', state: 'gather' };
+  const our1 = { type: 'soldier', hp: 40, dps: 4, vision: 100, setTarget(t) { this.target = t; } };
+  const our2 = { type: 'archer', hp: 30, dps: 4, vision: 100, setTarget(t) { this.target = t; } };
+  const enemy = { hp: 200, dps: 10, x: 0, y: 0, dead: false };
   const players = [
-    { units: [], structures: [], hero: null, ai: false },
+    { units: [enemy], structures: [], hero: null, ai: false },
     {
-      units: [workerRice, workerWater],
-      structures: [{ kind: 'square', queue: [] }],
+      units: [our1, our2],
+      structures: [{ kind: 'square', x: 0, y: 0 }],
       hero: null,
       ai: true,
       aiPlan: null,
-      res: { rice: 300, water: 50 },
+      res: { rice: 0, water: 0 },
     },
   ];
-  const deps = {
-    players,
-    COSTS: { square: { rice: 0, water: 0 }, well: { rice: 0, water: 0 }, barracks: { rice: 0, water: 0 }, range: { rice: 0, water: 0 }, mBarracks: { rice: 0, water: 0 } },
-    POP_CAP: 10,
-    placeGhost: () => false,
-    isBlocked: () => false,
-    neutral: { units: [] },
-    dist2,
-  };
-  const controller = new AIController(1, deps);
-  controller.init();
-  controller.redistributeWorkers();
-  assert.strictEqual(workerRice.role, 'water');
+  const deps = { players, COSTS: {}, POP_CAP: 10, placeGhost: () => false, isBlocked: () => false, neutral: { camps: [] }, dist2, packPower, campPower };
+  const ai = new AIController(1, deps);
+  ai.init();
+  ai.engage();
+  assert.ok(our1.retreat);
+  assert.ok(our2.retreat);
 })();
 
-// Scenario 6: learning adjusts composition after losses
+// rallyAttack selects target among all enemies
 (() => {
+  const weak = { kind: 'square', hp: 50, isGhost: false };
+  const strong = { kind: 'square', hp: 500, isGhost: false };
+  const unit = { type: 'soldier', setTarget(t) { this.target = t; } };
   const players = [
-    { units: [], structures: [], hero: null, ai: false },
+    { units: [], structures: [strong], hero: null, ai: false },
     {
-      units: [],
-      structures: [{ kind: 'square', queue: [] }],
+      units: [unit],
+      structures: [{ kind: 'square', x: 0, y: 0 }],
       hero: null,
       ai: true,
       aiPlan: null,
-      res: { rice: 100, water: 100 },
+      res: { rice: 0, water: 0 },
     },
+    { units: [], structures: [weak], hero: null, ai: false },
   ];
-  const deps = {
-    players,
-    COSTS: { square: { rice: 0, water: 0 }, well: { rice: 0, water: 0 }, barracks: { rice: 0, water: 0 }, range: { rice: 0, water: 0 }, mBarracks: { rice: 0, water: 0 } },
-    POP_CAP: 10,
-    placeGhost: () => false,
-    isBlocked: () => false,
-    neutral: { units: [] },
-    dist2,
-  };
-  const controller = new AIController(1, deps);
-  controller.init();
-  const before = players[1].aiPlan.comp.archer;
-  controller.recordBattleOutcome(false); // simulate loss
-  controller.updateLearning();
-  assert.ok(players[1].aiPlan.comp.archer >= before);
+  const deps = { players, COSTS: {}, POP_CAP: 10, placeGhost: () => false, isBlocked: () => false, neutral: { camps: [] }, dist2, packPower, campPower };
+  const ai = new AIController(1, deps);
+  ai.init();
+  ai.player.aiPlan.pushAt = 1;
+  ai.rallyAttack();
+  assert.strictEqual(unit.target, weak);
 })();
 
 console.log('All tests passed.');

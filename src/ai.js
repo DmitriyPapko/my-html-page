@@ -1,5 +1,6 @@
 /* ==== AI Controller ==== */
 import { Selector, Sequence, Action } from './ai/behavior.js';
+import { DEBUG_AI, packPower, campPower, AI_THRESHOLDS } from './config/ai.js';
 
 const DIFFICULTY_CONFIG = {
   easy: {
@@ -7,14 +8,14 @@ const DIFFICULTY_CONFIG = {
     open: ['well', 'barracks'],
     pushAt: 8,
     aggression: 0.5,
-    buildInterval: 20,
+    buildInterval: 4,
   },
   normal: {
     comp: { soldier: 0.4, archer: 0.4, mage: 0.2 },
     open: ['well', 'barracks', 'range'],
     pushAt: 10,
     aggression: 0.7,
-    buildInterval: 15,
+    buildInterval: 6,
   },
   hard: {
     comp: { soldier: 0.3, archer: 0.4, mage: 0.3 },
@@ -36,6 +37,11 @@ function aiInitPlan(P, level = 'normal') {
     aggression: cfg.aggression,
     buildInterval: cfg.buildInterval,
     buildTimer: 0,
+    buildFailCount: 0,
+    buildSearchRadius: 200,
+    trainCooldown: 0,
+    lastTrainCheck: 0,
+    minReserve: { ...AI_THRESHOLDS.minReserve },
     // Additional fields for extended scenarios
     scoutTimer: 0,
     finalPush: false,
@@ -61,13 +67,13 @@ class AIController {
   buildBehaviorTree() {
     this.behavior = new Sequence([
       new Action(() => { this.ensureHQ(); return true; }),
-      new Action(() => { this.buildOpenings(); return true; }),
+      new Action(({ dt }) => { this.buildOpenings(dt); return true; }),
       new Action(() => { this.maintainWorkers(); return true; }),
       new Action(() => { this.redistributeWorkers(); return true; }),
-      new Action(() => { this.trainUnits(); return true; }),
+      new Action(({ dt }) => { this.trainUnits(dt); return true; }),
       new Action(() => { this.heroActions(); return true; }),
       new Action(() => { this.earlyArmyFarm(); return true; }),
-      new Action(() => { this.adaptiveRecon(); return true; }),
+      new Action(({ dt }) => { this.adaptiveRecon(dt); return true; }),
       new Action(() => { this.defendBase(); return true; }),
       new Action(() => { this.coordinateWithAlly(); return true; }),
       new Action(() => { this.prepareFinalPush(); return true; }),
@@ -104,20 +110,30 @@ class AIController {
     }
   }
 
-  buildOpenings() {
+  buildOpenings(dt = 0) {
     const P = this.player;
     const { COSTS, placeGhost, isBlocked } = this.deps;
+    P.aiPlan.buildTimer -= dt;
     if (P.aiPlan.buildTimer > 0) return;
     const HQ = P.structures.find(s => s.kind === 'hq' || s.kind === 'square');
     if (P.aiPlan.nextBuild < P.aiPlan.open.length && HQ) {
       const worker = P.units.find(u => u.type === 'worker' && u.state !== 'build');
-      if (!worker) return;
+      if (!worker) {
+        this.maintainWorkers();
+        P.aiPlan.buildTimer = 1 + Math.random();
+        return;
+      }
       const kind = P.aiPlan.open[P.aiPlan.nextBuild];
+      if (P.structures.some(s => s.kind === kind && !s.isGhost)) {
+        P.aiPlan.nextBuild++;
+        return;
+      }
       const cost = COSTS[kind];
       if (P.res.rice >= cost.rice && P.res.water >= cost.water) {
+        const r = P.aiPlan.buildSearchRadius;
         const offsets = (kind === 'well')
-          ? [[-160, 120], [160, 120], [-160, -120], [160, -120]]
-          : [[180, 160], [180, -160], [-180, 160], [-180, -160]];
+          ? [[-r, r * 0.75], [r, r * 0.75], [-r, -r * 0.75], [r, -r * 0.75]]
+          : [[r, r], [r, -r], [-r, r], [-r, -r]];
         let placed = false;
         let px = 0, py = 0;
         for (const [dx, dy] of offsets) {
@@ -131,11 +147,21 @@ class AIController {
         if (placed) {
           P.aiPlan.nextBuild++;
           P.aiPlan.buildTimer = P.aiPlan.buildInterval;
+          P.aiPlan.buildFailCount = 0;
           const g = P.structures.find(s => s.isGhost && s.kind === kind && Math.hypot(s.x - px, s.y - py) < 10);
           if (g) {
             worker.state = 'build';
             worker.buildTargetId = g.id;
           }
+        } else {
+          P.aiPlan.buildFailCount++;
+          P.aiPlan.buildSearchRadius += 40;
+          if (P.aiPlan.buildFailCount >= 5) {
+            if (DEBUG_AI) console.log('build fail skip', kind);
+            P.aiPlan.buildFailCount = 0;
+            P.aiPlan.nextBuild++;
+          }
+          P.aiPlan.buildTimer = 1;
         }
       }
     }
@@ -176,25 +202,37 @@ class AIController {
     }
   }
 
-  trainUnits() {
+  trainUnits(dt = 0) {
     const P = this.player;
     const { POP_CAP } = this.deps;
+    P.aiPlan.trainCooldown -= dt;
+    if (P.aiPlan.trainCooldown > 0) return;
+    P.aiPlan.trainCooldown = 0.3 + Math.random() * 0.3;
     const barr = P.structures.find(s => s.kind === 'barracks' && !s.isGhost),
       rng = P.structures.find(s => s.kind === 'range' && !s.isGhost),
       mb = P.structures.find(s => s.kind === 'mBarracks' && !s.isGhost);
-    if (P.units.filter(u => !u.dead && !u.isHero).length < POP_CAP - 1) {
-      const r = Math.random();
-      if (barr && r < P.aiPlan.comp.soldier) barr.queue.push('soldier');
-      else if (rng && r < P.aiPlan.comp.soldier + P.aiPlan.comp.archer) rng.queue.push('archer');
-      else if (mb) mb.queue.push('mage');
-    }
+    const units = P.units.filter(u => !u.dead && !u.isHero);
+    if (units.length >= POP_CAP) return;
+    if (P.res.rice < P.aiPlan.minReserve.rice || P.res.water < P.aiPlan.minReserve.water) return;
+    const count = type => units.filter(u => u.type === type).length +
+      (barr && type === 'soldier' ? barr.queue.filter(q => q === 'soldier').length : 0) +
+      (rng && type === 'archer' ? rng.queue.filter(q => q === 'archer').length : 0) +
+      (mb && type === 'mage' ? mb.queue.filter(q => q === 'mage').length : 0);
+    const minComp = { soldier: 3, archer: 2, mage: 1 };
+    if (barr && count('soldier') < minComp.soldier && barr.queue.length < 5) { barr.queue.push('soldier'); return; }
+    if (rng && count('archer') < minComp.archer && rng.queue.length < 5) { rng.queue.push('archer'); return; }
+    if (mb && count('mage') < minComp.mage && mb.queue.length < 5) { mb.queue.push('mage'); return; }
+    const r = Math.random();
+    if (barr && r < P.aiPlan.comp.soldier && barr.queue.length < 5) barr.queue.push('soldier');
+    else if (rng && r < P.aiPlan.comp.soldier + P.aiPlan.comp.archer && rng.queue.length < 5) rng.queue.push('archer');
+    else if (mb && mb.queue.length < 5) mb.queue.push('mage');
   }
 
   // Scenario 2: adaptive reconnaissance using periodic scouting units
-  adaptiveRecon() {
+  adaptiveRecon(dt = 0) {
     const P = this.player;
     if (!P.aiPlan) return;
-    P.aiPlan.scoutTimer -= 1;
+    P.aiPlan.scoutTimer -= dt;
     if (P.aiPlan.scoutTimer > 0) return;
     const scout = P.units.find(u => u.type !== 'worker' && !u.isHero);
     if (scout && typeof scout.setDest === 'function') {
@@ -308,9 +346,13 @@ class AIController {
     const P = this.player;
     const { neutral, dist2 } = this.deps;
     const army = P.units.filter(u => u.type !== 'worker' && !u.isHero);
-    if (army.length >= 3 && army.length < P.aiPlan.pushAt) {
-      const nt = nearestNeutralCamp(P, neutral, dist2);
-      if (nt) { army.forEach(u => { if (!u.retreat) u.setTarget(nt); }); }
+    if (army.length < 2 || army.length >= P.aiPlan.pushAt) return;
+    const camp = nearestNeutralCamp(P, neutral, dist2);
+    if (!camp) return;
+    const ourP = packPower(army);
+    const campP = campPower(camp);
+    if (ourP >= campP * 1.2) {
+      army.forEach(u => { if (!u.retreat) u.setTarget(camp); });
     }
   }
 
@@ -318,9 +360,20 @@ class AIController {
     const P = this.player;
     const { players } = this.deps;
     const army = P.units.filter(u => u.type !== 'worker' && !u.isHero);
-    const enemyUnits = players[0].units.filter(u => !u.dead);
+    const enemies = players
+      .filter((_, i) => i !== this.id)
+      .flatMap(pl => pl.units.filter(u => !u.dead));
+    const ourP = packPower(army);
+    const enemyP = packPower(enemies);
+    if (enemyP > ourP * 1.2) {
+      army.forEach(a => {
+        a.retreat = true;
+        if (P.structures[0] && typeof a.setTarget === 'function') a.setTarget(P.structures[0]);
+      });
+      return;
+    }
     for (const u of army) {
-      const seen = enemyUnits.filter(e => Math.hypot(e.x - u.x, e.y - u.y) < u.vision);
+      const seen = enemies.filter(e => Math.hypot(e.x - u.x, e.y - u.y) < u.vision);
       if (seen.length) {
         const enemyCount = seen.length;
         const myCount = army.filter(a => Math.hypot(a.x - u.x, a.y - u.y) < u.vision).length;
@@ -337,9 +390,20 @@ class AIController {
     const { players } = this.deps;
     const army = P.units.filter(u => u.type !== 'worker' && !u.isHero);
     if (army.length >= P.aiPlan.pushAt) {
-      const enemyHero = players[0].hero && !players[0].hero.dead ? players[0].hero : null;
-      const tgt = enemyHero || players[0].structures.find(s => !s.isGhost) || players[0].units.find(u => !u.isHero);
-      if (tgt) { army.forEach(u => { if (!u.retreat) u.setTarget(tgt); }); }
+      let best = null;
+      let bestDef = Infinity;
+      players.forEach((pl, idx) => {
+        if (idx === this.id) return;
+        const check = target => {
+          if (!target || target.isGhost) return;
+          const def = target.hp || target.defense || 0;
+          if (def < bestDef) { bestDef = def; best = target; }
+        };
+        check(pl.hero && !pl.hero.dead ? pl.hero : null);
+        pl.structures.forEach(check);
+        pl.units.forEach(u => { if (!u.isHero) check(u); });
+      });
+      if (best) army.forEach(u => { if (!u.retreat) u.setTarget(best); });
     }
   }
 
@@ -354,14 +418,16 @@ class AIController {
 }
 
 function nearestNeutralCamp(P, neutral, dist2) {
-  if (!P.structures.length) return null;
-  if (!neutral || !Array.isArray(neutral.units) || neutral.units.length === 0) return null;
+  if (!P.structures.length || !neutral) return null;
+  const list = neutral.camps || neutral.units || [];
+  if (!list.length) return null;
   const origin = P.structures[0];
   let best = null;
   let bestDist = Infinity;
-  for (const n of neutral.units) {
-    if (n.dead) continue;
-    const d = dist2(origin.x, origin.y, n.x, n.y);
+  for (const n of list) {
+    const x = n.x || 0;
+    const y = n.y || 0;
+    const d = dist2(origin.x, origin.y, x, y);
     if (d < bestDist) { bestDist = d; best = n; }
   }
   return best;
