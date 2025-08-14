@@ -1,9 +1,9 @@
 const assert = require('assert');
-const { nearestNeutralCamp, aiThink } = require('../src/ai.js');
+const { AIController, nearestNeutralCamp, DIFFICULTY_CONFIG } = require('../src/ai.js');
 
 const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
 
-// no structures
+// nearestNeutralCamp tests remain
 (() => {
   const neutral = { units: [] };
   const P = { structures: [] };
@@ -11,7 +11,6 @@ const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
   assert.strictEqual(result, null);
 })();
 
-// no neutral units
 (() => {
   const neutral = { units: [] };
   const P = { structures: [{ x: 0, y: 0 }] };
@@ -19,7 +18,6 @@ const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
   assert.strictEqual(result, null);
 })();
 
-// chooses nearest
 (() => {
   const neutral = {
     units: [
@@ -32,7 +30,6 @@ const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
   assert.ok(result === neutral.units[1]);
 })();
 
-// all neutral camps dead
 (() => {
   const neutral = {
     units: [
@@ -45,8 +42,8 @@ const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
   assert.strictEqual(result, null);
 })();
 
-// aiThink works with injected dependencies
-(() => {
+// AIController initialization and behavior for each difficulty
+['easy', 'normal', 'hard'].forEach(level => {
   const players = [
     { units: [], structures: [], hero: null, ai: false },
     {
@@ -54,21 +51,25 @@ const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
       structures: [{ kind: 'square', queue: [] }],
       hero: null,
       ai: true,
-      aiPlan: { open: [], nextBuild: 0, comp: { soldier: 0, archer: 0, mage: 0 }, pushAt: 10 },
+      aiPlan: null,
       res: { rice: 100, water: 100 },
     },
   ];
   const deps = {
     players,
-    COSTS: {},
+    COSTS: { square: { rice: 0, water: 0 }, well: { rice: 0, water: 0 }, barracks: { rice: 0, water: 0 }, range: { rice: 0, water: 0 }, mBarracks: { rice: 0, water: 0 } },
     POP_CAP: 10,
     placeGhost: () => false,
     isBlocked: () => false,
     neutral: { units: [] },
     dist2,
   };
-  aiThink(0, 1, deps);
+  const controller = new AIController(1, deps);
+  controller.setDifficulty(level);
+  controller.init();
+  assert.strictEqual(players[1].aiPlan.pushAt, DIFFICULTY_CONFIG[level].pushAt);
+  controller.think(0);
   assert.ok(players[1].structures[0].queue.includes('worker'));
-})();
+});
 
 console.log('All tests passed.');

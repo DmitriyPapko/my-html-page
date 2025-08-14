@@ -93,8 +93,8 @@ function drawWeather(dt) {
       /* ==== Players & economy ==== */
       const players = [
         { name: 'Игрок', color: '#6bb0ff', res: { rice: 220, water: 100 }, units: [], structures: [], hero: null, ai: false, aiPlan: null },
-        { name: 'AI‑1', color: '#e05dff', res: { rice: 220, water: 100 }, units: [], structures: [], hero: null, ai: true, aiPlan: null },
-        { name: 'AI‑2', color: '#ffd27a', res: { rice: 220, water: 100 }, units: [], structures: [], hero: null, ai: true, aiPlan: null }
+        { name: 'AI‑1', color: '#e05dff', res: { rice: 220, water: 100 }, units: [], structures: [], hero: null, ai: true, aiPlan: null, difficulty: 'easy', controller: null },
+        { name: 'AI‑2', color: '#ffd27a', res: { rice: 220, water: 100 }, units: [], structures: [], hero: null, ai: true, aiPlan: null, difficulty: 'hard', controller: null }
       ];
       const riceNodes = [], waterNodes = [];
       const resUI = { rice: document.getElementById('resRice'), water: document.getElementById('resWater'), pop: document.getElementById('pop'), idle: document.getElementById('idleWorkers') };
@@ -153,6 +153,8 @@ function drawWeather(dt) {
       function getUnitDeps() {
         return { isBlocked, rand, players };
       }
+
+      const deps = getDeps();
 
       /* ==== Hero & abilities ==== */
       const heroPanel = document.getElementById('heroPanel'); const abilityDesc = document.getElementById('abilityDesc');
@@ -589,7 +591,18 @@ globalThis.drawHp = drawHp;
         clearVisible(); for (const s of players[0].structures) revealCircle(s.x, s.y, 520); for (const u of players[0].units) revealCircle(u.x, u.y, 480);
         if (!globalThis.paused) {
           const sp = 900 / world.zoom; if (input.keys['w'] || input.keys['ц']) world.camY -= sp * dt; if (input.keys['s'] || input.keys['ы']) world.camY += sp * dt; if (input.keys['a'] || input.keys['ф']) world.camX -= sp * dt; if (input.keys['d'] || input.keys['в']) world.camX += sp * dt; clampCam();
-          for (const p of players) { for (const s of p.structures) s.update(dt); for (const u of p.units) u.update(dt); if (p.ai) aiThink(dt, players.indexOf(p), getDeps()); }
+          for (const p of players) {
+            for (const s of p.structures) s.update(dt);
+            for (const u of p.units) u.update(dt);
+            if (p.ai) {
+              if (!p.controller) {
+                p.controller = new AIController(players.indexOf(p), deps);
+                p.controller.setDifficulty(p.difficulty || 'normal');
+                p.controller.init();
+              }
+              p.controller.think(dt);
+            }
+          }
           for (const n of neutral.units) { n.update(dt); if (n.dead && !n.awarded) { if (n.lastHitBy != null && n.lastHitBy >= 0) { heroGainFromNeutral(n.lastHitBy, n.tier); }
             if (n.group && n.group.dropsLeft > 0) { drops.push(new ItemDrop(n.x, n.y, lootFromTier(n.tier))); n.group.dropsLeft--; }
             n.awarded = true; } }
