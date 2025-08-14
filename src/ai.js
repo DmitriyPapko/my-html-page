@@ -25,14 +25,16 @@ function aiInitPlan(P) {
     nextBuild: 0,
   };
 }
-function aiThink(dt, id) {
-  const players = globalThis.players;
-  const COSTS = globalThis.COSTS;
-  const POP_CAP = globalThis.POP_CAP;
-  const placeGhost = globalThis.placeGhost;
-  const isBlocked = globalThis.isBlocked;
-  const neutral = globalThis.neutral;
-  const dist2 = globalThis.dist2;
+function aiThink(dt, id, deps) {
+  const {
+    players,
+    COSTS,
+    POP_CAP,
+    placeGhost,
+    isBlocked,
+    neutral,
+    dist2,
+  } = deps;
   if (!players[id].ai) return;
   if (!players[id].aiPlan) aiInitPlan(players[id]);
   const P = players[id];
@@ -115,11 +117,9 @@ function aiThink(dt, id) {
 }
 function nearestNeutralCamp(P, neutral, dist2) {
   if (!P.structures.length) {
-    console.warn('nearestNeutralCamp: no structures available');
     return null;
   }
   if (!neutral || !Array.isArray(neutral.units) || neutral.units.length === 0) {
-    console.warn('nearestNeutralCamp: no neutral units');
     return null;
   }
   const origin = P.structures[0];
