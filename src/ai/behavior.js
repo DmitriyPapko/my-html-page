@@ -4,7 +4,7 @@ export class Selector {
   }
   tick(ctx) {
     for (const child of this.children) {
-      if (child.tick(ctx)) return true;
+      if (child.tick(ctx) === true) return true;
     }
     return false;
   }
@@ -16,7 +16,7 @@ export class Sequence {
   }
   tick(ctx) {
     for (const child of this.children) {
-      if (!child.tick(ctx)) return false;
+      if (child.tick(ctx) === false) return false;
     }
     return true;
   }

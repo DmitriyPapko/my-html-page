@@ -66,22 +66,22 @@ class AIController {
   }
   buildBehaviorTree() {
     this.behavior = new Sequence([
-      new Action(() => { this.ensureHQ(); return true; }),
-      new Action(({ dt }) => { this.buildOpenings(dt); return true; }),
-      new Action(() => { this.maintainWorkers(); return true; }),
-      new Action(() => { this.redistributeWorkers(); return true; }),
-      new Action(({ dt }) => { this.trainUnits(dt); return true; }),
-      new Action(() => { this.heroActions(); return true; }),
-      new Action(() => { this.earlyArmyFarm(); return true; }),
-      new Action(({ dt }) => { this.adaptiveRecon(dt); return true; }),
-      new Action(() => { this.defendBase(); return true; }),
-      new Action(() => { this.coordinateWithAlly(); return true; }),
-      new Action(() => { this.prepareFinalPush(); return true; }),
-      new Action(() => { this.skirmish(); return true; }),
-      new Action(() => { this.engage(); return true; }),
-      new Action(() => { this.rallyAttack(); return true; }),
-      new Action(() => { this.completeGhosts(); return true; }),
-      new Action(() => { this.updateLearning(); return true; }),
+      new Action(this.ensureHQ.bind(this)),
+      new Action(this.buildOpenings.bind(this)),
+      new Action(this.maintainWorkers.bind(this)),
+      new Action(this.redistributeWorkers.bind(this)),
+      new Action(this.trainUnits.bind(this)),
+      new Action(this.heroActions.bind(this)),
+      new Action(this.earlyArmyFarm.bind(this)),
+      new Action(this.adaptiveRecon.bind(this)),
+      new Action(this.defendBase.bind(this)),
+      new Action(this.coordinateWithAlly.bind(this)),
+      new Action(this.prepareFinalPush.bind(this)),
+      new Action(this.skirmish.bind(this)),
+      new Action(this.engage.bind(this)),
+      new Action(this.rallyAttack.bind(this)),
+      new Action(this.completeGhosts.bind(this)),
+      new Action(this.updateLearning.bind(this)),
     ]);
   }
   think(dt) {
@@ -98,35 +98,36 @@ class AIController {
   ensureHQ() {
     const P = this.player;
     const { COSTS, placeGhost, isBlocked } = this.deps;
-    let HQ = P.structures.find(s => s.kind === 'hq' || s.kind === 'square');
-    if (!HQ) {
-      const cost = COSTS.square;
-      const px = P.startX || 0, py = P.startY || 0;
-      if (P.res.rice >= cost.rice && P.res.water >= cost.water && !isBlocked(px, py) && placeGhost(this.id, px, py, 'square')) {
-        const g = P.structures.find(s => s.isGhost && s.kind === 'square');
-        const w = P.units.find(u => u.type === 'worker');
-        if (g && w) { w.state = 'build'; w.buildTargetId = g.id; }
-      }
+    const HQ = P.structures.find(s => s.kind === 'hq' || s.kind === 'square');
+    if (HQ) return true;
+    const cost = COSTS.square;
+    const px = P.startX || 0, py = P.startY || 0;
+    if (P.res.rice >= cost.rice && P.res.water >= cost.water && !isBlocked(px, py) && placeGhost(this.id, px, py, 'square')) {
+      const g = P.structures.find(s => s.isGhost && s.kind === 'square');
+      const w = P.units.find(u => u.type === 'worker');
+      if (g && w) { w.state = 'build'; w.buildTargetId = g.id; }
+      return true;
     }
+    return false;
   }
 
-  buildOpenings(dt = 0) {
+  buildOpenings({ dt = 0 } = {}) {
     const P = this.player;
     const { COSTS, placeGhost, isBlocked } = this.deps;
     P.aiPlan.buildTimer -= dt;
-    if (P.aiPlan.buildTimer > 0) return;
+    if (P.aiPlan.buildTimer > 0) return true;
     const HQ = P.structures.find(s => s.kind === 'hq' || s.kind === 'square');
     if (P.aiPlan.nextBuild < P.aiPlan.open.length && HQ) {
       const worker = P.units.find(u => u.type === 'worker' && u.state !== 'build');
       if (!worker) {
         this.maintainWorkers();
         P.aiPlan.buildTimer = 1 + Math.random();
-        return;
+        return false;
       }
       const kind = P.aiPlan.open[P.aiPlan.nextBuild];
       if (P.structures.some(s => s.kind === kind && !s.isGhost)) {
         P.aiPlan.nextBuild++;
-        return;
+        return true;
       }
       const cost = COSTS[kind];
       if (P.res.rice >= cost.rice && P.res.water >= cost.water) {
@@ -153,28 +154,35 @@ class AIController {
             worker.state = 'build';
             worker.buildTargetId = g.id;
           }
-        } else {
-          P.aiPlan.buildFailCount++;
-          P.aiPlan.buildSearchRadius += 40;
-          if (P.aiPlan.buildFailCount >= 5) {
-            if (DEBUG_AI) console.log('build fail skip', kind);
-            P.aiPlan.buildFailCount = 0;
-            P.aiPlan.nextBuild++;
-          }
-          P.aiPlan.buildTimer = 1;
+          return true;
         }
+        P.aiPlan.buildFailCount++;
+        P.aiPlan.buildSearchRadius += 40;
+        if (P.aiPlan.buildFailCount >= 5) {
+          if (DEBUG_AI) console.log('build fail skip', kind);
+          P.aiPlan.buildFailCount = 0;
+          P.aiPlan.nextBuild++;
+        }
+        P.aiPlan.buildTimer = 1;
+        return false;
       }
+      return false;
     }
+    return true;
   }
 
   maintainWorkers() {
     const P = this.player;
     const { POP_CAP } = this.deps;
     const HQ = P.structures.find(s => s.kind === 'hq' || s.kind === 'square');
+    if (!HQ) return false;
+    let success = true;
     const wcount = P.units.filter(u => u.type === 'worker').length;
-    if (wcount < 6 && HQ) {
+    if (wcount < 6) {
       if (P.res.rice >= 50 && P.res.water >= 12 && P.units.filter(u => !u.dead && !u.isHero).length < POP_CAP) {
         HQ.queue.push('worker');
+      } else {
+        success = false;
       }
     }
     const unassigned = P.units.filter(u => u.type === 'worker' && (u.role === null || u.role === undefined));
@@ -183,12 +191,13 @@ class AIController {
       worker.role = resType;
       worker.state = 'idle';
     }
+    return success;
   }
 
   // Scenario 3: flexible distribution of workers between resources
   redistributeWorkers() {
     const P = this.player;
-    if (!P.units) return;
+    if (!P.units) return false;
     const riceWorkers = P.units.filter(u => u.type === 'worker' && u.role === 'rice');
     const waterWorkers = P.units.filter(u => u.type === 'worker' && u.role === 'water');
     if (P.res.rice < P.res.water && waterWorkers.length > 0) {
@@ -200,47 +209,52 @@ class AIController {
       w.role = 'water';
       w.state = 'idle';
     }
+    return true;
   }
 
-  trainUnits(dt = 0) {
+  trainUnits({ dt = 0 } = {}) {
     const P = this.player;
     const { POP_CAP } = this.deps;
     P.aiPlan.trainCooldown -= dt;
-    if (P.aiPlan.trainCooldown > 0) return;
+    if (P.aiPlan.trainCooldown > 0) return true;
     P.aiPlan.trainCooldown = 0.3 + Math.random() * 0.3;
     const barr = P.structures.find(s => s.kind === 'barracks' && !s.isGhost),
       rng = P.structures.find(s => s.kind === 'range' && !s.isGhost),
       mb = P.structures.find(s => s.kind === 'mBarracks' && !s.isGhost);
     const units = P.units.filter(u => !u.dead && !u.isHero);
-    if (units.length >= POP_CAP) return;
-    if (P.res.rice < P.aiPlan.minReserve.rice || P.res.water < P.aiPlan.minReserve.water) return;
+    if (units.length >= POP_CAP) return false;
+    if (P.res.rice < P.aiPlan.minReserve.rice || P.res.water < P.aiPlan.minReserve.water) return false;
     const count = type => units.filter(u => u.type === type).length +
       (barr && type === 'soldier' ? barr.queue.filter(q => q === 'soldier').length : 0) +
       (rng && type === 'archer' ? rng.queue.filter(q => q === 'archer').length : 0) +
       (mb && type === 'mage' ? mb.queue.filter(q => q === 'mage').length : 0);
     const minComp = { soldier: 3, archer: 2, mage: 1 };
-    if (barr && count('soldier') < minComp.soldier && barr.queue.length < 5) { barr.queue.push('soldier'); return; }
-    if (rng && count('archer') < minComp.archer && rng.queue.length < 5) { rng.queue.push('archer'); return; }
-    if (mb && count('mage') < minComp.mage && mb.queue.length < 5) { mb.queue.push('mage'); return; }
+    if (barr && count('soldier') < minComp.soldier && barr.queue.length < 5) { barr.queue.push('soldier'); return true; }
+    if (rng && count('archer') < minComp.archer && rng.queue.length < 5) { rng.queue.push('archer'); return true; }
+    if (mb && count('mage') < minComp.mage && mb.queue.length < 5) { mb.queue.push('mage'); return true; }
     const r = Math.random();
-    if (barr && r < P.aiPlan.comp.soldier && barr.queue.length < 5) barr.queue.push('soldier');
-    else if (rng && r < P.aiPlan.comp.soldier + P.aiPlan.comp.archer && rng.queue.length < 5) rng.queue.push('archer');
-    else if (mb && mb.queue.length < 5) mb.queue.push('mage');
+    if (barr && r < P.aiPlan.comp.soldier && barr.queue.length < 5) { barr.queue.push('soldier'); return true; }
+    if (rng && r < P.aiPlan.comp.soldier + P.aiPlan.comp.archer && rng.queue.length < 5) { rng.queue.push('archer'); return true; }
+    if (mb && mb.queue.length < 5) { mb.queue.push('mage'); return true; }
+    return false;
   }
 
   // Scenario 2: adaptive reconnaissance using periodic scouting units
-  adaptiveRecon(dt = 0) {
+  adaptiveRecon({ dt = 0 } = {}) {
     const P = this.player;
-    if (!P.aiPlan) return;
+    if (!P.aiPlan) return false;
     P.aiPlan.scoutTimer -= dt;
-    if (P.aiPlan.scoutTimer > 0) return;
+    if (P.aiPlan.scoutTimer > 0) return true;
     const scout = P.units.find(u => u.type !== 'worker' && !u.isHero);
     if (scout && typeof scout.setDest === 'function') {
       const px = (Math.random() - 0.5) * 800;
       const py = (Math.random() - 0.5) * 800;
       scout.setDest(px, py);
+      P.aiPlan.scoutTimer = 300;
+      return true;
     }
     P.aiPlan.scoutTimer = 300; // reset timer
+    return false;
   }
 
   // Scenario 1: base defense mode when resources low or under attack
@@ -248,7 +262,7 @@ class AIController {
     const P = this.player;
     const { players } = this.deps;
     const HQ = P.structures.find(s => s.kind === 'hq' || s.kind === 'square');
-    if (!HQ) return;
+    if (!HQ) return false;
     const enemyUnits = players[0] ? players[0].units.filter(u => !u.dead) : [];
     const threat = enemyUnits.find(e => Math.hypot(e.x - HQ.x, e.y - HQ.y) < 200);
     if (P.res.rice < 50 || P.res.water < 30 || threat) {
@@ -260,30 +274,35 @@ class AIController {
         const w = P.units.find(u => u.type === 'worker' && u.state !== 'build');
         if (w) { w.state = 'build'; w.buildTargetId = damaged.id; }
       }
+      return true;
     }
+    return false;
   }
 
   // Scenario 4: coordinate with allies for combined attacks
   coordinateWithAlly() {
     const { players } = this.deps;
-    if (!players || players.length < 3) return;
+    if (!players || players.length < 3) return false;
     const ally = players[2];
-    if (!ally || !ally.attackTarget) return;
+    if (!ally || !ally.attackTarget) return false;
     const army = this.player.units.filter(u => u.type !== 'worker' && !u.isHero);
     army.forEach(u => { if (typeof u.setTarget === 'function') u.setTarget(ally.attackTarget); });
+    return true;
   }
 
   // Scenario 5: preparation for a final push when resources and army allow
   prepareFinalPush() {
     const P = this.player;
-    if (P.aiPlan.finalPush) return;
+    if (P.aiPlan.finalPush) return true;
     const army = P.units.filter(u => u.type !== 'worker' && !u.isHero);
     if (army.length >= P.aiPlan.pushAt && P.res.rice > 200 && P.res.water > 200) {
       P.aiPlan.finalPush = true;
       P.aiPlan.pushAt = army.length + 5;
       const mb = P.structures.find(s => s.kind === 'mBarracks' && !s.isGhost);
       if (mb) mb.queue.push('mage');
+      return true;
     }
+    return false;
   }
 
   // Scenario 7: hybrid attack-retreat probing enemy defenses
@@ -291,15 +310,16 @@ class AIController {
     const P = this.player;
     const { players } = this.deps;
     const enemy = players[0];
-    if (!enemy) return;
+    if (!enemy) return false;
     const army = P.units.filter(u => u.type !== 'worker' && !u.isHero);
-    if (army.length < 2) return;
+    if (army.length < 2) return false;
     const probe = army.slice(0, Math.min(2, army.length));
     const target = enemy.structures[0] || enemy.units[0];
     if (target) probe.forEach(u => { if (typeof u.setTarget === 'function') u.setTarget(target); });
     if (enemy.units.length > army.length) {
       probe.forEach(u => { if (typeof u.setTarget === 'function') u.setTarget(P.structures[0]); });
     }
+    return true;
   }
 
   // Scenario 6: simple learning mechanism adjusting unit composition
@@ -312,7 +332,7 @@ class AIController {
 
   updateLearning() {
     const P = this.player;
-    if (!P.aiPlan || !P.aiPlan.battleHistory.length) return;
+    if (!P.aiPlan || !P.aiPlan.battleHistory.length) return false;
     const wins = P.aiPlan.battleHistory.filter(Boolean).length;
     const losses = P.aiPlan.battleHistory.length - wins;
     if (losses > wins) {
@@ -320,6 +340,7 @@ class AIController {
       P.aiPlan.comp.soldier = Math.max(0, 1 - P.aiPlan.comp.archer - P.aiPlan.comp.mage);
     }
     P.aiPlan.battleHistory = [];
+    return true;
   }
 
   heroActions() {
@@ -339,27 +360,32 @@ class AIController {
           hero.inventory.splice(idx, 1);
         }
       }
+      return true;
     }
+    return false;
   }
 
   earlyArmyFarm() {
     const P = this.player;
     const { neutral, dist2 } = this.deps;
     const army = P.units.filter(u => u.type !== 'worker' && !u.isHero);
-    if (army.length < 2 || army.length >= P.aiPlan.pushAt) return;
+    if (army.length < 2 || army.length >= P.aiPlan.pushAt) return false;
     const camp = nearestNeutralCamp(P, neutral, dist2);
-    if (!camp) return;
+    if (!camp) return false;
     const ourP = packPower(army);
     const campP = campPower(camp);
     if (ourP >= campP * 1.2) {
       army.forEach(u => { if (!u.retreat) u.setTarget(camp); });
+      return true;
     }
+    return false;
   }
 
   engage() {
     const P = this.player;
     const { players } = this.deps;
     const army = P.units.filter(u => u.type !== 'worker' && !u.isHero);
+    if (!army.length) return false;
     const enemies = players
       .filter((_, i) => i !== this.id)
       .flatMap(pl => pl.units.filter(u => !u.dead));
@@ -370,7 +396,7 @@ class AIController {
         a.retreat = true;
         if (P.structures[0] && typeof a.setTarget === 'function') a.setTarget(P.structures[0]);
       });
-      return;
+      return true;
     }
     for (const u of army) {
       const seen = enemies.filter(e => Math.hypot(e.x - u.x, e.y - u.y) < u.vision);
@@ -379,10 +405,12 @@ class AIController {
         const myCount = army.filter(a => Math.hypot(a.x - u.x, a.y - u.y) < u.vision).length;
         if (myCount > enemyCount) {
           army.forEach(a => { if (!a.retreat) a.setTarget(seen[0]); });
+          return true;
         }
         break;
       }
     }
+    return false;
   }
 
   rallyAttack() {
@@ -403,8 +431,13 @@ class AIController {
         pl.structures.forEach(check);
         pl.units.forEach(u => { if (!u.isHero) check(u); });
       });
-      if (best) army.forEach(u => { if (!u.retreat) u.setTarget(best); });
+      if (best) {
+        army.forEach(u => { if (!u.retreat) u.setTarget(best); });
+        return true;
+      }
+      return false;
     }
+    return false;
   }
 
   completeGhosts() {
@@ -412,8 +445,10 @@ class AIController {
     const ghost = P.structures.find(s => s.isGhost);
     if (ghost) {
       const w = P.units.find(u => u.type === 'worker' && u.state !== 'build');
-      if (w) { w.state = 'build'; w.buildTargetId = ghost.id; }
+      if (w) { w.state = 'build'; w.buildTargetId = ghost.id; return true; }
+      return false;
     }
+    return false;
   }
 }
 
