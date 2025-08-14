@@ -2,6 +2,7 @@
   "name": "my-html-page",
   "version": "1.0.0",
   "description": "A simple static HTML page project.",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "test": "node test/ai.test.js && node test/mp-regen.test.js"

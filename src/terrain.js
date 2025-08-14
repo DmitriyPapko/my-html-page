@@ -1,4 +1,5 @@
 import { drawSprite } from './sprites.js';
+import { WATER, RICE } from './config/visual.js';
 
 /* ==== Terrain generation and blockers ==== */
 const blockers = []; // {x,y,r,kind}
@@ -14,7 +15,11 @@ const waterTile = document.createElement('canvas');
 waterTile.width = TILE; waterTile.height = TILE;
 const wctx = waterTile.getContext('2d');
 wctx.imageSmoothingEnabled = false;
-drawSprite(wctx, 'water', TILE / 2, TILE / 2, { scale: 4 });
+const grad = wctx.createLinearGradient(0, 0, 0, TILE);
+grad.addColorStop(0, '#1e5799');
+grad.addColorStop(1, '#08304b');
+wctx.fillStyle = grad;
+wctx.fillRect(0, 0, TILE, TILE);
 
 const treeBase = document.createElement('canvas');
 treeBase.width = 16; treeBase.height = 16;
@@ -63,7 +68,18 @@ export function drawTerrain() {
       const size = step * world.zoom;
       ctx.drawImage(grassTile, dx, dy, size, size);
       const tx = Math.floor(x / step), ty = Math.floor(y / step);
-      if ((hash(tx, ty) & 255) < 10) ctx.drawImage(waterTile, dx, dy, size, size);
+      if ((hash(tx, ty) & 255) < 10) {
+        ctx.drawImage(waterTile, dx, dy, size, size);
+        const t = (globalThis.simTime || 0) * WATER.waveSpeed;
+        ctx.save();
+        ctx.globalAlpha = 0.2;
+        ctx.fillStyle = '#fff';
+        for (let i = 0; i < size; i += 8) {
+          const ry = Math.sin((i / size + t) * Math.PI * 2) * WATER.waveAmp;
+          ctx.fillRect(dx + i, dy + size / 2 + ry, 8, WATER.rippleScale * size);
+        }
+        ctx.restore();
+      }
     }
   }
 }

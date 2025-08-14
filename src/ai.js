@@ -1,15 +1,5 @@
 /* ==== AI Controller ==== */
-// Support both Node (tests) and browser environments. In Node we use
-// `require` while in the browser the behavior classes are exposed on
-// `globalThis` by `behavior.js` which is imported separately.
-let Selector, Sequence, Action;
-if (typeof require !== 'undefined') {
-  // Node/CommonJS path used in tests
-  ({ Selector, Sequence, Action } = require('./ai/behavior.js'));
-} else {
-  // Browser path – behavior.js attaches classes to globalThis
-  ({ Selector, Sequence, Action } = globalThis);
-}
+import { Selector, Sequence, Action } from './ai/behavior.js';
 
 const DIFFICULTY_CONFIG = {
   easy: {
@@ -350,8 +340,5 @@ function nearestNeutralCamp(P, neutral, dist2) {
   return best;
 }
 
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { AIController, aiInitPlan, nearestNeutralCamp, DIFFICULTY_CONFIG };
-} else {
-  Object.assign(globalThis, { AIController, aiInitPlan, nearestNeutralCamp, DIFFICULTY_CONFIG });
-}
+export { AIController, aiInitPlan, nearestNeutralCamp, DIFFICULTY_CONFIG };
+Object.assign(globalThis, { AIController, aiInitPlan, nearestNeutralCamp, DIFFICULTY_CONFIG });
