@@ -36,6 +36,9 @@ function toPixel(v) { return Math.round(v * DPR) / DPR; }
 function drawShadow(x, y, r) { ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(toPixel(x), toPixel(y), r, r * 0.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
 Object.assign(globalThis, { clamp, rand, dist2, cvs, ctx, mini, mctx, DPR, world, screenToWorld, worldToScreen, clampCam, toPixel, drawShadow });
 
+// provide a default isBlocked implementation until terrain initializes
+globalThis.isBlocked = globalThis.isBlocked || (() => false);
+
 /* ==== Audio (простые огибающие без внешних файлов) ==== */
 const AC = window.AudioContext ? new AudioContext() : null;
 function beep(freq = 440, dur = 0.08, type = 'triangle', gain = 0.06) {
@@ -111,7 +114,7 @@ function drawWeather(dt) {
       function canPlaceBuildingAt(x, y) {
         const R = 40;
         if (x < R || y < R || x > world.width - R || y > world.height - R) return false;
-        if (isBlocked(x, y)) return false;
+        if (globalThis.isBlocked && globalThis.isBlocked(x, y)) return false;
         for (const n of riceNodes) { if (dist2(x, y, n.x, n.y) <= (n.radius + R) * (n.radius + R)) return false; }
         for (const n of waterNodes) { if (dist2(x, y, n.x, n.y) <= (n.radius + R) * (n.radius + R)) return false; }
         for (const p of players) { for (const s of p.structures) { if (dist2(x, y, s.x, s.y) <= (s.radius + R) * (s.radius + R)) return false; } }
@@ -147,11 +150,23 @@ function drawWeather(dt) {
       }
 
       function getDeps() {
-        return { players, COSTS, POP_CAP, placeGhost, isBlocked, neutral, dist2 };
+        return {
+          players,
+          COSTS,
+          POP_CAP,
+          placeGhost,
+          isBlocked: (...args) => globalThis.isBlocked(...args),
+          neutral,
+          dist2,
+        };
       }
 
       function getUnitDeps() {
-        return { isBlocked, rand, players };
+        return {
+          isBlocked: (...args) => globalThis.isBlocked(...args),
+          rand,
+          players,
+        };
       }
 
       const deps = getDeps();
