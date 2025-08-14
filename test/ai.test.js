@@ -4,6 +4,77 @@ import { packPower, campPower } from '../src/config/ai.js';
 
 const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
 
+// ensureHQ returns false without resources then succeeds
+(() => {
+  const COSTS = { square: { rice: 50, water: 50 } };
+  const players = [
+    { units: [], structures: [], hero: null, ai: false },
+    {
+      units: [{ type: 'worker', state: 'idle' }],
+      structures: [],
+      hero: null,
+      ai: true,
+      aiPlan: null,
+      res: { rice: 0, water: 0 },
+      startX: 0,
+      startY: 0,
+    },
+  ];
+  let placed = false;
+  const deps = {
+    players,
+    COSTS,
+    POP_CAP: 10,
+    placeGhost: () => { placed = true; players[1].structures.push({ kind: 'square', isGhost: true, id: 1, x: 0, y: 0, queue: [] }); return true; },
+    isBlocked: () => false,
+    neutral: { camps: [] },
+    dist2,
+    packPower,
+    campPower,
+  };
+  const ai = new AIController(1, deps);
+  ai.init();
+  assert.strictEqual(ai.ensureHQ(), false);
+  players[1].res.rice = 50; players[1].res.water = 50;
+  assert.strictEqual(ai.ensureHQ(), true);
+  assert.ok(placed);
+})();
+
+// buildOpenings waits for resources and retries next tick
+(() => {
+  const COSTS = { square: { rice: 0, water: 0 }, barracks: { rice: 60, water: 40 } };
+  const events = [];
+  const players = [
+    { units: [], structures: [], hero: null, ai: false },
+    {
+      units: [{ type: 'worker', state: 'idle' }],
+      structures: [{ kind: 'square', x: 0, y: 0, queue: [], id: 1 }],
+      hero: null,
+      ai: true,
+      aiPlan: null,
+      res: { rice: 0, water: 0 },
+    },
+  ];
+  const deps = {
+    players,
+    COSTS,
+    POP_CAP: 10,
+    placeGhost: (id, x, y, kind) => { events.push({ x, y, kind }); players[1].structures.push({ kind, x, y, id: events.length + 1, isGhost: true, queue: [] }); return true; },
+    isBlocked: () => false,
+    neutral: { camps: [] },
+    dist2,
+    packPower,
+    campPower,
+  };
+  const ai = new AIController(1, deps);
+  ai.init();
+  ai.player.aiPlan.open = ['barracks'];
+  assert.strictEqual(ai.buildOpenings({ dt: 0 }), false);
+  players[1].res.rice = 60; players[1].res.water = 40;
+  assert.strictEqual(ai.buildOpenings({ dt: 0 }), true);
+  assert.strictEqual(events[0].kind, 'barracks');
+})();
+
 // buildOpenings places well and barracks with fallback when blocked
 (() => {
   const COSTS = { square: { rice: 0, water: 0 }, well: { rice: 0, water: 0 }, barracks: { rice: 0, water: 0 } };
@@ -36,11 +107,11 @@ const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
   };
   const ai = new AIController(1, deps);
   ai.init();
-  ai.buildOpenings(0); // build well
+  assert.strictEqual(ai.buildOpenings({ dt: 0 }), true); // build well
   players[1].units[0].state = 'idle';
-  ai.buildOpenings(6); // attempt barracks but blocked after timer
-  ai.buildOpenings(1); // cooldown and retry
-  ai.buildOpenings(0); // fallback placement
+  assert.strictEqual(ai.buildOpenings({ dt: 6 }), false); // attempt barracks but blocked after timer
+  assert.strictEqual(ai.buildOpenings({ dt: 1 }), true); // cooldown tick, no attempt
+  assert.strictEqual(ai.buildOpenings({ dt: 0 }), true); // fallback placement
   assert.strictEqual(events[0].kind, 'well');
   assert.strictEqual(events[1].kind, 'barracks');
   assert.ok(Math.abs(events[1].x) > 220);
@@ -65,9 +136,12 @@ const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
   const deps = { players, COSTS, POP_CAP: 10, placeGhost: () => false, isBlocked: () => false, neutral: { camps: [] }, dist2, packPower, campPower };
   const ai = new AIController(1, deps);
   ai.init();
-  ai.trainUnits(1); // soldier to reach minimum
+  players[1].res.rice = 0; players[1].res.water = 0;
+  assert.strictEqual(ai.trainUnits({ dt: 1 }), false);
+  players[1].res.rice = 200; players[1].res.water = 200;
+  assert.strictEqual(ai.trainUnits({ dt: 1 }), true); // soldier to reach minimum
   players[1].units.push({ type: 'soldier' });
-  ai.trainUnits(1); // archer next
+  assert.strictEqual(ai.trainUnits({ dt: 1 }), true); // archer next
   assert.strictEqual(barr.queue[0], 'soldier');
   assert.strictEqual(rng.queue[0], 'archer');
 })();
@@ -93,7 +167,7 @@ const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
   const deps = { players, COSTS: {}, POP_CAP: 10, placeGhost: () => false, isBlocked: () => false, neutral, dist2, packPower, campPower };
   const ai = new AIController(1, deps);
   ai.init();
-  ai.earlyArmyFarm();
+  assert.strictEqual(ai.earlyArmyFarm(), true);
   assert.strictEqual(hero.target, undefined);
   assert.strictEqual(soldier.target, camp);
   assert.strictEqual(archer.target, camp);
@@ -118,9 +192,29 @@ const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
   const deps = { players, COSTS: {}, POP_CAP: 10, placeGhost: () => false, isBlocked: () => false, neutral: { camps: [] }, dist2, packPower, campPower };
   const ai = new AIController(1, deps);
   ai.init();
-  ai.engage();
+  assert.strictEqual(ai.engage(), true);
   assert.ok(our1.retreat);
   assert.ok(our2.retreat);
+})();
+
+// engage returns false when no enemies are around
+(() => {
+  const unit = { type: 'soldier', hp: 40, dps: 4, vision: 100 };
+  const players = [
+    { units: [], structures: [], hero: null, ai: false },
+    {
+      units: [unit],
+      structures: [{ kind: 'square', x: 0, y: 0 }],
+      hero: null,
+      ai: true,
+      aiPlan: null,
+      res: { rice: 0, water: 0 },
+    },
+  ];
+  const deps = { players, COSTS: {}, POP_CAP: 10, placeGhost: () => false, isBlocked: () => false, neutral: { camps: [] }, dist2, packPower, campPower };
+  const ai = new AIController(1, deps);
+  ai.init();
+  assert.strictEqual(ai.engage(), false);
 })();
 
 // rallyAttack selects target among all enemies
@@ -144,7 +238,7 @@ const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
   const ai = new AIController(1, deps);
   ai.init();
   ai.player.aiPlan.pushAt = 1;
-  ai.rallyAttack();
+  assert.strictEqual(ai.rallyAttack(), true);
   assert.strictEqual(unit.target, weak);
 })();
 
