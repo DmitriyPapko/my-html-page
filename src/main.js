@@ -539,6 +539,9 @@ function drawWeather(dt) {
       await import("./ui.js");
 await import("./terrain.js");
 await import("./fog.js");
+// `ai.js` depends on `behavior.js` attaching symbols to `globalThis` in the
+// browser, so ensure it is loaded before the controller itself.
+await import("./ai/behavior.js");
 await import("./ai.js");
 
 /* ==== Setup/Reset ==== */

@@ -1,5 +1,15 @@
 /* ==== AI Controller ==== */
-const { Selector, Sequence, Action } = require('./ai/behavior.js');
+// Support both Node (tests) and browser environments. In Node we use
+// `require` while in the browser the behavior classes are exposed on
+// `globalThis` by `behavior.js` which is imported separately.
+let Selector, Sequence, Action;
+if (typeof require !== 'undefined') {
+  // Node/CommonJS path used in tests
+  ({ Selector, Sequence, Action } = require('./ai/behavior.js'));
+} else {
+  // Browser path – behavior.js attaches classes to globalThis
+  ({ Selector, Sequence, Action } = globalThis);
+}
 
 const DIFFICULTY_CONFIG = {
   easy: {
