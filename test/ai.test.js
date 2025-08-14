@@ -1,5 +1,5 @@
-const assert = require('assert');
-const { AIController, nearestNeutralCamp, DIFFICULTY_CONFIG } = require('../src/ai.js');
+import assert from 'assert';
+import { AIController, nearestNeutralCamp, DIFFICULTY_CONFIG } from '../src/ai.js';
 
 const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
 

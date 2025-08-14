@@ -1,5 +1,6 @@
 import { drawSprite } from "./sprites.js";
 import { Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, getById, enemiesFor, allUnits, allStructures, nearestNode, lootFromTier } from "./entities.js";
+import { FireAuraEffect } from "./effects/FireAuraEffect.js";
 
 /* ==== Helpers ==== */
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -251,7 +252,7 @@ function drawWeather(dt) {
       const itemInfo = {
         scroll_hp: { name: 'Свиток HP', desc: '+120 HP и +80 макс HP', rarity: 'Обычный' },
         scroll_dps: { name: 'Свиток DPS', desc: '+10 DPS на 20с', rarity: 'Обычный' },
-        scroll_fire: { name: 'Свиток ауры огня', desc: 'Огненная аура 20с, 25 урона/с в радиусе 100', rarity: 'Обычный' },
+        scroll_fire_aura: { name: 'Свиток ауры огня', desc: 'Огненная аура 20с, 10 урона/с в радиусе 100', rarity: 'Обычный' },
         ring_atk: { name: 'Кольцо маны', desc: '+40 MP', rarity: 'Редкий' },
         boots: { name: 'Сапоги', desc: '+20 скорость', rarity: 'Редкий' },
         amulet: { name: 'Амулет', desc: '+120 HP', rarity: 'Редкий' },
@@ -260,7 +261,7 @@ function drawWeather(dt) {
       const itemColors = {
         scroll_hp: '#7cff97',
         scroll_dps: '#ffd27a',
-        scroll_fire: '#ff7a4d',
+        scroll_fire_aura: '#ff7a4d',
         ring_atk: '#8ad',
         boots: '#8ad',
         amulet: '#8ad',
@@ -301,9 +302,10 @@ function drawWeather(dt) {
           if (remove) return;
           hero.dps += 10; hero.auraTimer = 20; if (typeof beep === 'function' && !muted) beep(720, 0.08, 'square', 0.06);
           setTimeout(() => { hero.dps -= 10; }, 20000);
-        } else if (itemKind === 'scroll_fire') {
+        } else if (itemKind === 'scroll_fire_aura') {
           if (remove) return;
-          hero.fireAura = 20; hero.fireAuraTick = 0; if (typeof beep === 'function' && !muted) beep(640, 0.08, 'sawtooth', 0.06);
+          hero.effects.push(new FireAuraEffect({ radius: 100, dpsPerTick: 10, tickMs: 1000, durationMs: 20000 }));
+          if (typeof beep === 'function' && !muted) beep(640, 0.08, 'sawtooth', 0.06);
         } else if (itemKind === 'ring_atk') {
           hero.maxMp += 40 * sign; hero.mp += 40 * sign; if (!remove && typeof beep === 'function' && !muted) beep(540, 0.08, 'sawtooth', 0.05);
         } else if (itemKind === 'boots') {
@@ -498,7 +500,7 @@ function drawWeather(dt) {
             extra = `HP: ${(e.hp | 0)}/${(e.maxHp | 0)}\nOwner: ${owner}`;
           } else {
             t = e.displayName || 'Нейтрал';
-            const names = { scroll_hp: 'Свиток HP', scroll_dps: 'Свиток DPS', scroll_fire: 'Свиток ауры огня', ring_atk: 'Кольцо маны', boots: 'Сапоги', amulet: 'Амулет', orb: 'Орб маны' };
+            const names = { scroll_hp: 'Свиток HP', scroll_dps: 'Свиток DPS', scroll_fire_aura: 'Свиток ауры огня', ring_atk: 'Кольцо маны', boots: 'Сапоги', amulet: 'Амулет', orb: 'Орб маны' };
             let loot = '';
             if (e.lootTable) {
               loot = e.lootTable.map(l => `${names[l.item] || l.item} (${Math.round(l.chance * 100)}%)`).join(', ');

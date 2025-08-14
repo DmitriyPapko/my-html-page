@@ -87,11 +87,10 @@ export class Unit extends Entity {
     this.retreat = false;
     this.regen = 0.25;
     this.auraTimer = 0;
-    this.fireAura = 0;
-    this.fireAuraTick = 0;
     this.buildTargetId = null;
     this.noteTimer = 0;
     this.nodeId = null;
+    this.effects = [];
   }
   setDest(x, y) {
     this.destX = x;
@@ -208,20 +207,10 @@ export class Unit extends Entity {
       this.mp = Math.min(this.maxMp, this.mp + this.mpRegen * dt * 60);
     }
     if (this.auraTimer > 0) { this.auraTimer = Math.max(0, this.auraTimer - dt); }
-    if (this.fireAura > 0) {
-      this.fireAura = Math.max(0, this.fireAura - dt);
-      this.fireAuraTick -= dt;
-      if (this.fireAuraTick <= 0) {
-        this.fireAuraTick = 1;
-        const R = 100;
-        const enemies = enemiesFor(this.owner);
-        for (const e of enemies) {
-          if (e.dead) continue;
-          if (globalThis.dist2(this.x, this.y, e.x, e.y) <= R * R) {
-            e.damage(25, this.owner);
-          }
-        }
-      }
+    for (let i = this.effects.length - 1; i >= 0; i--) {
+      const eff = this.effects[i];
+      eff.update(dt, this);
+      if (eff.done) this.effects.splice(i, 1);
     }
     this.cd1 = Math.max(0, this.cd1 - dt);
     this.cd2 = Math.max(0, this.cd2 - dt);
@@ -317,12 +306,8 @@ export class Unit extends Entity {
     }
     ctx.restore();
     globalThis.drawHp(s.x, s.y - 18 * zoom, this.hp / this.maxHp);
-    if (this.fireAura > 0) {
-      ctx.strokeStyle = 'rgba(255,80,0,0.35)';
-      const pulse = 100 + Math.sin(Date.now() / 200) * 5;
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, pulse * zoom, 0, 6.283);
-      ctx.stroke();
+    for (const eff of this.effects) {
+      if (eff.draw) eff.draw(ctx, this);
     }
     if (this.auraTimer > 0) {
       ctx.strokeStyle = 'rgba(255,215,0,0.5)';
@@ -515,7 +500,7 @@ export class ItemDrop extends Entity {
     const colors = {
       scroll_hp: '#7cff97',
       scroll_dps: '#ffd27a',
-      scroll_fire: '#ff7a4d',
+      scroll_fire_aura: '#ff7a4d',
       ring_atk: '#8ad',
       boots: '#8ad',
       amulet: '#8ad',
@@ -722,7 +707,7 @@ export function nearestNode(type, P) {
 }
 
 export function lootFromTier(t) {
-  const base = ['scroll_hp', 'scroll_dps', 'scroll_fire'];
+  const base = ['scroll_hp', 'scroll_dps', 'scroll_fire_aura'];
   const rare = ['ring_atk', 'boots', 'amulet', 'orb'];
   return (Math.random() < 0.6 ? base[(Math.random() * base.length) | 0] : rare[(Math.random() * rare.length) | 0]);
 }

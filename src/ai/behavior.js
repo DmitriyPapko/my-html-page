@@ -1,4 +1,4 @@
-class Selector {
+export class Selector {
   constructor(children = []) {
     this.children = children;
   }
@@ -10,7 +10,7 @@ class Selector {
   }
 }
 
-class Sequence {
+export class Sequence {
   constructor(children = []) {
     this.children = children;
   }
@@ -22,7 +22,7 @@ class Sequence {
   }
 }
 
-class Action {
+export class Action {
   constructor(fn) {
     this.fn = fn;
   }
@@ -31,8 +31,5 @@ class Action {
   }
 }
 
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { Selector, Sequence, Action };
-} else {
-  Object.assign(globalThis, { Selector, Sequence, Action });
-}
+// Expose for browser without bundler
+Object.assign(globalThis, { Selector, Sequence, Action });

@@ -1,14 +1,14 @@
-const assert = require('assert');
-const { Unit } = require('../src/entities.js');
+import assert from 'assert';
+import { Unit } from '../src/entities.js';
 
-global.isBlocked = () => false;
-global.getById = () => null;
-global.enemiesFor = () => [];
-global.dist2 = () => 0;
-global.players = [];
-global.neutral = { units: [] };
-global.riceNodes = [{ id: 1, x: 10, y: 0 }];
-global.waterNodes = [];
+globalThis.isBlocked = () => false;
+globalThis.getById = () => null;
+globalThis.enemiesFor = () => [];
+globalThis.dist2 = () => 0;
+globalThis.players = [];
+globalThis.neutral = { units: [] };
+globalThis.riceNodes = [{ id: 1, x: 10, y: 0 }];
+globalThis.waterNodes = [];
 
 // mp regenerates up to max
 (() => {
@@ -34,7 +34,7 @@ console.log('MP regen tests passed.');
 
 // Unit.updateWorker uses injected deps
 (() => {
-  global.rand = () => { throw new Error('global rand used'); };
+  globalThis.rand = () => { throw new Error('global rand used'); };
   const fakeRand = () => 0;
   let blocked = 0;
   const isBlocked = () => { blocked++; return false; };
