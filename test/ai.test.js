@@ -72,4 +72,94 @@ const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
   assert.ok(players[1].structures[0].queue.includes('worker'));
 });
 
+// Scenario 1: defense mode engages nearby threats
+(() => {
+  const enemyUnit = { id: 99, x: 5, y: 5, dead: false };
+  const soldier = { type: 'soldier', x: 0, y: 0, setTarget(t) { this.target = t; } };
+  const players = [
+    { units: [enemyUnit], structures: [], hero: null, ai: false },
+    {
+      units: [soldier],
+      structures: [{ id: 1, kind: 'square', x: 0, y: 0, queue: [], hp: 100, maxHp: 100 }],
+      hero: null,
+      ai: true,
+      aiPlan: null,
+      res: { rice: 100, water: 100 },
+    },
+  ];
+  const deps = {
+    players,
+    COSTS: { square: { rice: 0, water: 0 }, well: { rice: 0, water: 0 }, barracks: { rice: 0, water: 0 }, range: { rice: 0, water: 0 }, mBarracks: { rice: 0, water: 0 } },
+    POP_CAP: 10,
+    placeGhost: () => false,
+    isBlocked: () => false,
+    neutral: { units: [] },
+    dist2,
+  };
+  const controller = new AIController(1, deps);
+  controller.init();
+  controller.defendBase();
+  assert.strictEqual(soldier.target, enemyUnit);
+})();
+
+// Scenario 3: worker redistribution swaps roles based on resources
+(() => {
+  const workerRice = { type: 'worker', role: 'rice', state: 'gather' };
+  const workerWater = { type: 'worker', role: 'water', state: 'gather' };
+  const players = [
+    { units: [], structures: [], hero: null, ai: false },
+    {
+      units: [workerRice, workerWater],
+      structures: [{ kind: 'square', queue: [] }],
+      hero: null,
+      ai: true,
+      aiPlan: null,
+      res: { rice: 300, water: 50 },
+    },
+  ];
+  const deps = {
+    players,
+    COSTS: { square: { rice: 0, water: 0 }, well: { rice: 0, water: 0 }, barracks: { rice: 0, water: 0 }, range: { rice: 0, water: 0 }, mBarracks: { rice: 0, water: 0 } },
+    POP_CAP: 10,
+    placeGhost: () => false,
+    isBlocked: () => false,
+    neutral: { units: [] },
+    dist2,
+  };
+  const controller = new AIController(1, deps);
+  controller.init();
+  controller.redistributeWorkers();
+  assert.strictEqual(workerRice.role, 'water');
+})();
+
+// Scenario 6: learning adjusts composition after losses
+(() => {
+  const players = [
+    { units: [], structures: [], hero: null, ai: false },
+    {
+      units: [],
+      structures: [{ kind: 'square', queue: [] }],
+      hero: null,
+      ai: true,
+      aiPlan: null,
+      res: { rice: 100, water: 100 },
+    },
+  ];
+  const deps = {
+    players,
+    COSTS: { square: { rice: 0, water: 0 }, well: { rice: 0, water: 0 }, barracks: { rice: 0, water: 0 }, range: { rice: 0, water: 0 }, mBarracks: { rice: 0, water: 0 } },
+    POP_CAP: 10,
+    placeGhost: () => false,
+    isBlocked: () => false,
+    neutral: { units: [] },
+    dist2,
+  };
+  const controller = new AIController(1, deps);
+  controller.init();
+  const before = players[1].aiPlan.comp.archer;
+  controller.recordBattleOutcome(false); // simulate loss
+  controller.updateLearning();
+  assert.ok(players[1].aiPlan.comp.archer >= before);
+})();
+
 console.log('All tests passed.');
