@@ -35,6 +35,10 @@ function aiInitPlan(P, level = 'normal') {
     nextBuild: 0,
     aggression: cfg.aggression,
     buildInterval: cfg.buildInterval,
+    // Additional fields for extended scenarios
+    scoutTimer: 0,
+    finalPush: false,
+    battleHistory: [],
   };
 }
 
@@ -58,12 +62,19 @@ class AIController {
       new Action(() => { this.ensureHQ(); return true; }),
       new Action(() => { this.buildOpenings(); return true; }),
       new Action(() => { this.maintainWorkers(); return true; }),
+      new Action(() => { this.redistributeWorkers(); return true; }),
       new Action(() => { this.trainUnits(); return true; }),
       new Action(() => { this.heroActions(); return true; }),
       new Action(() => { this.earlyArmyFarm(); return true; }),
+      new Action(() => { this.adaptiveRecon(); return true; }),
+      new Action(() => { this.defendBase(); return true; }),
+      new Action(() => { this.coordinateWithAlly(); return true; }),
+      new Action(() => { this.prepareFinalPush(); return true; }),
+      new Action(() => { this.skirmish(); return true; }),
       new Action(() => { this.engage(); return true; }),
       new Action(() => { this.rallyAttack(); return true; }),
       new Action(() => { this.completeGhosts(); return true; }),
+      new Action(() => { this.updateLearning(); return true; }),
     ]);
   }
   think(dt) {
@@ -121,6 +132,23 @@ class AIController {
     }
   }
 
+  // Scenario 3: flexible distribution of workers between resources
+  redistributeWorkers() {
+    const P = this.player;
+    if (!P.units) return;
+    const riceWorkers = P.units.filter(u => u.type === 'worker' && u.role === 'rice');
+    const waterWorkers = P.units.filter(u => u.type === 'worker' && u.role === 'water');
+    if (P.res.rice < P.res.water && waterWorkers.length > 0) {
+      const w = waterWorkers.pop();
+      w.role = 'rice';
+      w.state = 'idle';
+    } else if (P.res.water < P.res.rice && riceWorkers.length > 0) {
+      const w = riceWorkers.pop();
+      w.role = 'water';
+      w.state = 'idle';
+    }
+  }
+
   trainUnits() {
     const P = this.player;
     const { POP_CAP } = this.deps;
@@ -133,6 +161,100 @@ class AIController {
       else if (rng && r < P.aiPlan.comp.soldier + P.aiPlan.comp.archer) rng.queue.push('archer');
       else if (mb) mb.queue.push('mage');
     }
+  }
+
+  // Scenario 2: adaptive reconnaissance using periodic scouting units
+  adaptiveRecon() {
+    const P = this.player;
+    if (!P.aiPlan) return;
+    P.aiPlan.scoutTimer -= 1;
+    if (P.aiPlan.scoutTimer > 0) return;
+    const scout = P.units.find(u => u.type !== 'worker' && !u.isHero);
+    if (scout && typeof scout.setDest === 'function') {
+      const px = (Math.random() - 0.5) * 800;
+      const py = (Math.random() - 0.5) * 800;
+      scout.setDest(px, py);
+    }
+    P.aiPlan.scoutTimer = 300; // reset timer
+  }
+
+  // Scenario 1: base defense mode when resources low or under attack
+  defendBase() {
+    const P = this.player;
+    const { players } = this.deps;
+    const HQ = P.structures.find(s => s.kind === 'hq' || s.kind === 'square');
+    if (!HQ) return;
+    const enemyUnits = players[0] ? players[0].units.filter(u => !u.dead) : [];
+    const threat = enemyUnits.find(e => Math.hypot(e.x - HQ.x, e.y - HQ.y) < 200);
+    if (P.res.rice < 50 || P.res.water < 30 || threat) {
+      const army = P.units.filter(u => u.type !== 'worker' && !u.isHero);
+      if (threat) army.forEach(u => { if (typeof u.setTarget === 'function') u.setTarget(threat); });
+      else if (army.length) army.forEach(u => { if (typeof u.setTarget === 'function') u.setTarget(HQ); });
+      const damaged = P.structures.find(s => s.hp && s.maxHp && s.hp < s.maxHp);
+      if (damaged) {
+        const w = P.units.find(u => u.type === 'worker' && u.state !== 'build');
+        if (w) { w.state = 'build'; w.buildTargetId = damaged.id; }
+      }
+    }
+  }
+
+  // Scenario 4: coordinate with allies for combined attacks
+  coordinateWithAlly() {
+    const { players } = this.deps;
+    if (!players || players.length < 3) return;
+    const ally = players[2];
+    if (!ally || !ally.attackTarget) return;
+    const army = this.player.units.filter(u => u.type !== 'worker' && !u.isHero);
+    army.forEach(u => { if (typeof u.setTarget === 'function') u.setTarget(ally.attackTarget); });
+  }
+
+  // Scenario 5: preparation for a final push when resources and army allow
+  prepareFinalPush() {
+    const P = this.player;
+    if (P.aiPlan.finalPush) return;
+    const army = P.units.filter(u => u.type !== 'worker' && !u.isHero);
+    if (army.length >= P.aiPlan.pushAt && P.res.rice > 200 && P.res.water > 200) {
+      P.aiPlan.finalPush = true;
+      P.aiPlan.pushAt = army.length + 5;
+      const mb = P.structures.find(s => s.kind === 'mBarracks' && !s.isGhost);
+      if (mb) mb.queue.push('mage');
+    }
+  }
+
+  // Scenario 7: hybrid attack-retreat probing enemy defenses
+  skirmish() {
+    const P = this.player;
+    const { players } = this.deps;
+    const enemy = players[0];
+    if (!enemy) return;
+    const army = P.units.filter(u => u.type !== 'worker' && !u.isHero);
+    if (army.length < 2) return;
+    const probe = army.slice(0, Math.min(2, army.length));
+    const target = enemy.structures[0] || enemy.units[0];
+    if (target) probe.forEach(u => { if (typeof u.setTarget === 'function') u.setTarget(target); });
+    if (enemy.units.length > army.length) {
+      probe.forEach(u => { if (typeof u.setTarget === 'function') u.setTarget(P.structures[0]); });
+    }
+  }
+
+  // Scenario 6: simple learning mechanism adjusting unit composition
+  recordBattleOutcome(result) {
+    const P = this.player;
+    if (!P.aiPlan) return;
+    P.aiPlan.battleHistory.push(result);
+    if (P.aiPlan.battleHistory.length > 5) P.aiPlan.battleHistory.shift();
+  }
+
+  updateLearning() {
+    const P = this.player;
+    if (!P.aiPlan || !P.aiPlan.battleHistory.length) return;
+    const wins = P.aiPlan.battleHistory.filter(Boolean).length;
+    const losses = P.aiPlan.battleHistory.length - wins;
+    if (losses > wins) {
+      P.aiPlan.comp.archer = Math.min(P.aiPlan.comp.archer + 0.1, 1);
+      P.aiPlan.comp.soldier = Math.max(0, 1 - P.aiPlan.comp.archer - P.aiPlan.comp.mage);
+    }
+    P.aiPlan.battleHistory = [];
   }
 
   heroActions() {
