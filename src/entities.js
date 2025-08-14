@@ -82,6 +82,8 @@ export class Unit extends Entity {
     this.retreat = false;
     this.regen = 0.25;
     this.auraTimer = 0;
+    this.fireAura = 0;
+    this.fireAuraTick = 0;
     this.buildTargetId = null;
     this.noteTimer = 0;
     this.nodeId = null;
@@ -201,6 +203,21 @@ export class Unit extends Entity {
       this.mp = Math.min(this.maxMp, this.mp + this.mpRegen * dt * 60);
     }
     if (this.auraTimer > 0) { this.auraTimer = Math.max(0, this.auraTimer - dt); }
+    if (this.fireAura > 0) {
+      this.fireAura = Math.max(0, this.fireAura - dt);
+      this.fireAuraTick -= dt;
+      if (this.fireAuraTick <= 0) {
+        this.fireAuraTick = 1;
+        const R = 100;
+        const enemies = enemiesFor(this.owner);
+        for (const e of enemies) {
+          if (e.dead) continue;
+          if (globalThis.dist2(this.x, this.y, e.x, e.y) <= R * R) {
+            e.damage(25, this.owner);
+          }
+        }
+      }
+    }
     this.cd1 = Math.max(0, this.cd1 - dt);
     this.cd2 = Math.max(0, this.cd2 - dt);
     this.cd3 = Math.max(0, this.cd3 - dt);
@@ -295,6 +312,13 @@ export class Unit extends Entity {
     }
     ctx.restore();
     globalThis.drawHp(s.x, s.y - 18 * zoom, this.hp / this.maxHp);
+    if (this.fireAura > 0) {
+      ctx.strokeStyle = 'rgba(255,80,0,0.35)';
+      const pulse = 100 + Math.sin(Date.now() / 200) * 5;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, pulse * zoom, 0, 6.283);
+      ctx.stroke();
+    }
     if (this.auraTimer > 0) {
       ctx.strokeStyle = 'rgba(255,215,0,0.5)';
       ctx.beginPath();
@@ -427,9 +451,50 @@ export class ResourceNode {
   draw() {
     if (!globalThis.isExplored(this.x, this.y)) return;
     const s = globalThis.worldToScreen(this.x, this.y);
-    const scale = globalThis.world.zoom * (this.radius * 2 / 16);
-    globalThis.drawShadow(s.x, s.y + 8 * globalThis.world.zoom, this.radius * globalThis.world.zoom * 0.6);
-    globalThis.drawSprite(this.type === 'rice' ? 'rice' : 'waterNode', s.x, s.y, scale);
+    const ctx = globalThis.ctx;
+    const zoom = globalThis.world.zoom;
+    const r = this.radius * zoom;
+    globalThis.drawShadow(s.x, s.y + 8 * zoom, r * 0.6);
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.scale(zoom, zoom);
+    ctx.lineWidth = 2;
+    if (this.type === 'rice') {
+      const grad = ctx.createLinearGradient(-this.radius, -this.radius, this.radius, this.radius);
+      grad.addColorStop(0, '#cddc39');
+      grad.addColorStop(1, '#a0b020');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.rect(-this.radius, -this.radius, this.radius * 2, this.radius * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#3b7a3b';
+      ctx.stroke();
+    } else {
+      const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
+      grad.addColorStop(0, '#83b9d4');
+      grad.addColorStop(1, '#5a9bb7');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.rect(-this.radius, -this.radius, this.radius * 2, this.radius * 2);
+      ctx.fill();
+      // animated transparent waves
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      ctx.strokeStyle = '#ffffff';
+      const t = Date.now() / 1000;
+      for (let i = -this.radius; i <= this.radius; i += 6) {
+        ctx.beginPath();
+        const off = Math.sin(i * 0.3 + t * 3) * 2;
+        ctx.moveTo(-this.radius, i + off);
+        ctx.lineTo(this.radius, i + off);
+        ctx.stroke();
+      }
+      ctx.restore();
+      ctx.strokeStyle = '#2e7d32';
+      ctx.strokeRect(-this.radius, -this.radius, this.radius * 2, this.radius * 2);
+      ctx.beginPath();
+    }
+    ctx.restore();
   }
 }
 
@@ -440,14 +505,19 @@ export class ItemDrop extends Entity {
     this.radius = 14;
   }
   draw() {
-    if (!globalThis.isExplored(this.x, this.y)) return;
+    if (this.dead || !globalThis.isExplored(this.x, this.y)) return;
     const s = globalThis.worldToScreen(this.x, this.y);
-    const map = { scroll_hp: 'HP', scroll_dps: 'DPS', ring_atk: 'Mana', boots: 'Boots', amulet: 'Amul', orb: 'Orb' };
-    const col = (this.kind === 'scroll_hp') ? '#7cff97' : (this.kind === 'scroll_dps' ? '#ffd27a' : '#8ad');
+    const colors = {
+      scroll_hp: '#7cff97',
+      scroll_dps: '#ffd27a',
+      scroll_fire: '#ff7a4d',
+      ring_atk: '#8ad',
+      boots: '#8ad',
+      amulet: '#8ad',
+      orb: '#8ad'
+    };
+    const col = colors[this.kind] || '#8ad';
     globalThis.drawSprite('item', s.x, s.y - 10 * globalThis.world.zoom, globalThis.world.zoom * 1.25, { r: col, R: col });
-    globalThis.ctx.fillStyle = '#000';
-    globalThis.ctx.font = `${12 * globalThis.world.zoom}px system-ui`;
-    globalThis.ctx.fillText(map[this.kind] || this.kind, s.x - 16 * globalThis.world.zoom, s.y + 14 * globalThis.world.zoom);
   }
 }
 
@@ -647,7 +717,7 @@ export function nearestNode(type, P) {
 }
 
 export function lootFromTier(t) {
-  const base = ['scroll_hp', 'scroll_dps'];
+  const base = ['scroll_hp', 'scroll_dps', 'scroll_fire'];
   const rare = ['ring_atk', 'boots', 'amulet', 'orb'];
-  return (Math.random() < 0.6 ? base[Math.random() < 0.5 ? 0 : 1] : rare[(Math.random() * rare.length) | 0]);
+  return (Math.random() < 0.6 ? base[(Math.random() * base.length) | 0] : rare[(Math.random() * rare.length) | 0]);
 }

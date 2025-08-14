@@ -70,16 +70,20 @@ function aiThink(dt, id) {
     else if (rng && r < P.aiPlan.comp.soldier + P.aiPlan.comp.archer) rng.queue.push('archer');
     else if (mb) mb.queue.push('mage');
   }
-  // hero farms nearest neutral
+  // hero farms neutrals only with support
+  const army = P.units.filter(u => u.type !== 'worker' && !u.isHero);
   const hero = P.hero;
   if (hero && !hero.dead) {
-    const tgt = nearestNeutralCamp(P, neutral, dist2);
-    if (tgt) {
-      hero.setTarget(tgt);
+    if (army.length >= 2 && hero.hp > hero.maxHp * 0.6) {
+      const tgt = nearestNeutralCamp(P, neutral, dist2);
+      if (tgt) { hero.setTarget(tgt); }
+    }
+    if (hero.targetId) {
+      const idx = hero.inventory.findIndex(it => it.startsWith('scroll_'));
+      if (idx >= 0) { globalThis.applyItem(hero, hero.inventory[idx]); hero.inventory.splice(idx, 1); }
     }
   }
   // early army neutral farming
-  const army = P.units.filter(u => u.type !== 'worker' && !u.isHero);
   if (army.length >= 3 && army.length < P.aiPlan.pushAt) {
     const nt = nearestNeutralCamp(P, neutral, dist2);
     if (nt) { army.forEach(u => { if (!u.retreat) u.setTarget(nt); }); }

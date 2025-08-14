@@ -226,10 +226,20 @@ function drawWeather(dt) {
       const itemInfo = {
         scroll_hp: { name: 'Свиток HP', desc: '+120 HP и +80 макс HP', rarity: 'Обычный' },
         scroll_dps: { name: 'Свиток DPS', desc: '+10 DPS на 20с', rarity: 'Обычный' },
+        scroll_fire: { name: 'Свиток ауры огня', desc: 'Огненная аура 20с, 25 урона/с в радиусе 100', rarity: 'Обычный' },
         ring_atk: { name: 'Кольцо маны', desc: '+40 MP', rarity: 'Редкий' },
         boots: { name: 'Сапоги', desc: '+20 скорость', rarity: 'Редкий' },
         amulet: { name: 'Амулет', desc: '+120 HP', rarity: 'Редкий' },
         orb: { name: 'Орб маны', desc: '+60 MP', rarity: 'Редкий' }
+      };
+      const itemColors = {
+        scroll_hp: '#7cff97',
+        scroll_dps: '#ffd27a',
+        scroll_fire: '#ff7a4d',
+        ring_atk: '#8ad',
+        boots: '#8ad',
+        amulet: '#8ad',
+        orb: '#8ad'
       };
       const invHotkeys = ['Q', 'E', 'R', 'G', 'T', 'Y'];
       function renderInventory(hero) {
@@ -239,31 +249,44 @@ function drawWeather(dt) {
         for (let i = 0; i < cap; i++) {
           const slot = document.createElement('div'); slot.className = 'invSlot';
           if (arr[i]) {
-            const it = arr[i]; const inf = itemInfo[it];
-            slot.textContent = inf?.name || it;
-            const hk = invHotkeys[i];
+            const it = arr[i]; const inf = itemInfo[it]; const hk = invHotkeys[i];
+            const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 32; const cctx = canvas.getContext('2d'); cctx.imageSmoothingEnabled = false;
+            const col = itemColors[it] || '#8ad';
+            drawSprite(cctx, 'item', 16, 16, { scale: 2, override: { r: col, R: col } });
+            slot.appendChild(canvas);
+            slot.style.border = '2px solid ' + col;
             slot.title = `${inf?.name || it}\n${inf?.desc || ''}\nРедкость: ${inf?.rarity || ''}\n[${hk}]`;
-            slot.onclick = (e) => { applyItem(hero, it); hero.inventory.splice(i, 1); renderInventory(hero); flashSlot(i); };
-            slot.oncontextmenu = (e) => { e.preventDefault(); applyItem(hero, it); hero.inventory.splice(i, 1); renderInventory(hero); flashSlot(i); };
+            if (it.startsWith('scroll_')) {
+              slot.onclick = (e) => { applyItem(hero, it); hero.inventory.splice(i, 1); renderInventory(hero); flashSlot(i); };
+              slot.oncontextmenu = (e) => { e.preventDefault(); applyItem(hero, it); hero.inventory.splice(i, 1); renderInventory(hero); flashSlot(i); };
+            }
+            slot.draggable = true;
+            slot.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', i.toString()); });
           }
           invGrid.appendChild(slot);
         }
       }
       function flashSlot(i) { const el = invGrid.children[i]; if (el) { el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 150); } }
-      function applyItem(hero, itemKind) {
+      function applyItem(hero, itemKind, remove = false) {
+        const sign = remove ? -1 : 1;
         if (itemKind === 'scroll_hp') {
+          if (remove) return;
           hero.maxHp += 80; hero.hp = Math.min(hero.maxHp, hero.hp + 120); if (typeof beep === 'function' && !muted) beep(620, 0.08, 'triangle', 0.05);
         } else if (itemKind === 'scroll_dps') {
+          if (remove) return;
           hero.dps += 10; hero.auraTimer = 20; if (typeof beep === 'function' && !muted) beep(720, 0.08, 'square', 0.06);
           setTimeout(() => { hero.dps -= 10; }, 20000);
+        } else if (itemKind === 'scroll_fire') {
+          if (remove) return;
+          hero.fireAura = 20; hero.fireAuraTick = 0; if (typeof beep === 'function' && !muted) beep(640, 0.08, 'sawtooth', 0.06);
         } else if (itemKind === 'ring_atk') {
-          hero.maxMp += 40; hero.mp += 40; if (typeof beep === 'function' && !muted) beep(540, 0.08, 'sawtooth', 0.05);
+          hero.maxMp += 40 * sign; hero.mp += 40 * sign; if (!remove && typeof beep === 'function' && !muted) beep(540, 0.08, 'sawtooth', 0.05);
         } else if (itemKind === 'boots') {
-          hero.baseSpeed += 20; hero.speed += 20; if (typeof beep === 'function' && !muted) beep(480, 0.08, 'square', 0.05);
+          hero.baseSpeed += 20 * sign; hero.speed += 20 * sign; if (!remove && typeof beep === 'function' && !muted) beep(480, 0.08, 'square', 0.05);
         } else if (itemKind === 'amulet') {
-          hero.maxHp += 120; hero.hp += 120; if (typeof beep === 'function' && !muted) beep(660, 0.08, 'triangle', 0.05);
+          hero.maxHp += 120 * sign; hero.hp += 120 * sign; if (!remove && typeof beep === 'function' && !muted) beep(660, 0.08, 'triangle', 0.05);
         } else if (itemKind === 'orb') {
-          hero.maxMp += 60; hero.mp += 60; if (typeof beep === 'function' && !muted) beep(580, 0.08, 'sawtooth', 0.05);
+          hero.maxMp += 60 * sign; hero.mp += 60 * sign; if (!remove && typeof beep === 'function' && !muted) beep(580, 0.08, 'sawtooth', 0.05);
         }
         if (hero.owner === 0) setHeroUI(hero);
       }
@@ -299,6 +322,19 @@ function drawWeather(dt) {
         }
       });
       cvs.addEventListener('contextmenu', e => { e.preventDefault(); if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; } });
+      cvs.addEventListener('dragover', e => e.preventDefault());
+      cvs.addEventListener('drop', e => {
+        e.preventDefault();
+        const idx = e.dataTransfer.getData('text/plain');
+        const h = players[0].hero;
+        if (!h || !h.inventory[idx]) return;
+        const it = h.inventory[idx];
+        if (!it.startsWith('scroll_')) applyItem(h, it, true);
+        h.inventory.splice(idx, 1);
+        const w = screenToWorld(e.offsetX, e.offsetY);
+        drops.push(new ItemDrop(w.x, w.y, it));
+        renderInventory(h);
+      });
       window.addEventListener('keydown', e => {
         const k = e.key.toLowerCase();
         input.keys[k] = true;
@@ -311,10 +347,12 @@ function drawWeather(dt) {
           const h = players[0].hero;
           if (h && h.inventory[idx]) {
             const it = h.inventory[idx];
-            applyItem(h, it);
-            h.inventory.splice(idx, 1);
-            renderInventory(h);
-            flashSlot(idx);
+            if (it.startsWith('scroll_')) {
+              applyItem(h, it);
+              h.inventory.splice(idx, 1);
+              renderInventory(h);
+              flashSlot(idx);
+            } else { playSfx('denied'); }
           } else { playSfx('denied'); }
         }
         if (k === 'r') { resumeWorkers(players[0]); }
@@ -435,7 +473,7 @@ function drawWeather(dt) {
             extra = `HP: ${(e.hp | 0)}/${(e.maxHp | 0)}\nOwner: ${owner}`;
           } else {
             t = e.displayName || 'Нейтрал';
-            const names = { scroll_hp: 'Свиток HP', scroll_dps: 'Свиток DPS', ring_atk: 'Кольцо маны', boots: 'Сапоги', amulet: 'Амулет', orb: 'Орб маны' };
+            const names = { scroll_hp: 'Свиток HP', scroll_dps: 'Свиток DPS', scroll_fire: 'Свиток ауры огня', ring_atk: 'Кольцо маны', boots: 'Сапоги', amulet: 'Амулет', orb: 'Орб маны' };
             let loot = '';
             if (e.lootTable) {
               loot = e.lootTable.map(l => `${names[l.item] || l.item} (${Math.round(l.chance * 100)}%)`).join(', ');
@@ -471,7 +509,7 @@ function drawWeather(dt) {
       }
 
       /* ==== Utils ==== */
-      Object.assign(globalThis, { players, neutral, drops, projectiles, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes, canPlaceBuildingAt, placeGhost, enqueueUnit, trainUnit, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel, updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, getById, enemiesFor, Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, input, setHeroUI, spawnHero });
+      Object.assign(globalThis, { players, neutral, drops, projectiles, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes, canPlaceBuildingAt, placeGhost, enqueueUnit, trainUnit, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel, updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, getById, enemiesFor, Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, input, setHeroUI, spawnHero, applyItem });
 
       await import("./ui.js");
 await import("./terrain.js");
@@ -519,7 +557,20 @@ await import("./ai.js");
 globalThis.resetGame = resetGame;
 
       /* ==== Loot & pickup ==== */
-      function tryPickup() { for (const p of players) { const h = p.hero; if (h && !h.dead) { for (const d of drops) { if (!d.dead && Math.sqrt(dist2(d.x, d.y, h.x, h.y)) < 28) { if (h.inventory.length < 6) { h.inventory.push(d.kind); d.dead = true; if (p === players[0]) renderInventory(h); } } } } } }
+      function tryPickup() {
+        for (const p of players) {
+          const h = p.hero; if (!h || h.dead) continue;
+          for (const d of drops) {
+            if (!d.dead && Math.sqrt(dist2(d.x, d.y, h.x, h.y)) < 28) {
+              if (h.inventory.length < 6) {
+                h.inventory.push(d.kind); d.dead = true;
+                if (!d.kind.startsWith('scroll_')) applyItem(h, d.kind);
+                if (p === players[0]) renderInventory(h);
+              }
+            }
+          }
+        }
+      }
 
       /* ==== Loop ==== */
       let last = performance.now();
