@@ -137,13 +137,21 @@ function drawWeather(dt) {
         if (players[owner].units.filter(u => !u.dead && !u.isHero).length >= POP_CAP) { if (owner === 0) playSfx('denied'); return false; }
         const cost = unitType === 'soldier' ? { rice: 60, water: 24 } : unitType === 'mage' ? { rice: 80, water: 46 } : unitType === 'archer' ? { rice: 70, water: 36 } : unitType === 'worker' ? { rice: 50, water: 12 } : { rice: 0, water: 0 };
         const R = players[owner].res; if (R.rice < cost.rice || R.water < cost.water) { if (owner === 0) playSfx('denied'); return false; } R.rice -= cost.rice; if (owner === 0) updateRes();
-        const u = new Unit(barr.x + 36, barr.y, owner, unitType);
+        const u = new Unit(barr.x + 36, barr.y, owner, unitType, getUnitDeps());
         if (unitType === 'soldier') { u.dps = 30; u.maxHp = 160; u.hp = 160; u.attackRange = 30; u.regen = 0.35; }
         if (unitType === 'archer') { u.dps = 20; u.maxHp = 120; u.hp = 120; u.attackRange = 250; u.vision = 520; u.regen = 0.25; }
         if (unitType === 'mage') { u.dps = 22; u.maxHp = 110; u.hp = 110; u.attackRange = 210; u.regen = 0.25; }
         players[owner].units.push(u);
         if (!muted) beep(520, 0.06, 'sawtooth', 0.04);
         return true;
+      }
+
+      function getDeps() {
+        return { players, COSTS, POP_CAP, placeGhost, isBlocked, neutral, dist2 };
+      }
+
+      function getUnitDeps() {
+        return { isBlocked, rand, players };
       }
 
       /* ==== Hero & abilities ==== */
@@ -182,7 +190,7 @@ function drawWeather(dt) {
       }
       ab1.onclick = () => tryCast(1); ab2.onclick = () => tryCast(2); ab3.onclick = () => tryCast(3);
       function spawnHero(owner, x, y, cls = null) {
-        const h = new Unit(x, y, owner, 'soldier'); h.isHero = true; h.maxHp = 420; h.hp = 420; h.maxMp = 160; h.mp = 120; h.dps = 50; h.attackRange = 40; h.vision = 560; h.inventory = []; h.level = 1; h.exp = 0; h.expToNext = 100; h.regen = 0.83; h.mpRegen = 0.8;
+        const h = new Unit(x, y, owner, 'soldier', getUnitDeps()); h.isHero = true; h.maxHp = 420; h.hp = 420; h.maxMp = 160; h.mp = 120; h.dps = 50; h.attackRange = 40; h.vision = 560; h.inventory = []; h.level = 1; h.exp = 0; h.expToNext = 100; h.regen = 0.83; h.mpRegen = 0.8;
         if (!cls) { const r = Math.random(); cls = r < 0.34 ? 'paladin' : (r < 0.67 ? 'rogue' : 'archmage'); }
         h.heroClass = cls; players[owner].chosenClass = cls;
         if (cls === 'paladin') { h.heroName = 'Паладин'; h.cdM1 = 8; h.cdM2 = 12; h.cdM3 = 16; }
@@ -301,13 +309,13 @@ function drawWeather(dt) {
         if (slot === 2 && h.cd2 <= 0) {
           if (h.heroClass === 'paladin') { if (h.mp < 35) return; h.mp -= 35; h.shield = (h.shield || 0) + 120; beep(280, 0.08, 'triangle', 0.05); }
           else if (h.heroClass === 'rogue') { if (h.mp < 40) return; h.mp -= 40; const R = 180; for (const e of players[1].units.concat(players[2].units, neutral.units)) { if (e.dead) continue; if (Math.hypot(e.x - h.x, e.y - h.y) <= R) { e.damage(70, 0); } } beep(720, 0.08, 'square', 0.06); }
-          else { if (h.mp < 60) return; h.mp -= 60; const e = new Unit(h.x + 24, h.y, h.owner, 'elemental'); e.dps = 18; e.maxHp = 200; e.hp = 200; e.attackRange = 210; e.summonTimer = 20; players[h.owner].units.push(e); beep(480, 0.09, 'sawtooth', 0.06); }
+          else { if (h.mp < 60) return; h.mp -= 60; const e = new Unit(h.x + 24, h.y, h.owner, 'elemental', getUnitDeps()); e.dps = 18; e.maxHp = 200; e.hp = 200; e.attackRange = 210; e.summonTimer = 20; players[h.owner].units.push(e); beep(480, 0.09, 'sawtooth', 0.06); }
           h.cd2 = h.cdM2; if (h.owner === 0) setHeroUI(h);
         }
         if (slot === 3 && h.cd3 <= 0) {
           if (h.heroClass === 'paladin') { if (h.mp < 45) return; h.mp -= 45; const R = 200; for (const u of players[0].units) { if (Math.hypot(u.x - h.x, u.y - h.y) <= R) u.hp = Math.min(u.maxHp, u.hp + 70); } for (const e of players[1].units.concat(players[2].units, neutral.units)) { if (Math.hypot(e.x - h.x, e.y - h.y) <= R) e.damage(60, 0); } beep(560, 0.09, 'triangle', 0.06); }
           else if (h.heroClass === 'rogue') { if (h.mp < 55) return; h.mp -= 55; const R = 220; for (const e of players[1].units.concat(players[2].units, neutral.units)) { if (Math.hypot(e.x - h.x, e.y - h.y) <= R) { e.damage(50, 0); e.slow = 3.5; } } beep(900, 0.07, 'square', 0.06); }
-          else { if (h.mp < 90) return; h.mp -= 90; const d = new Unit(h.x + 28, h.y + 12, h.owner, 'demon'); d.dps = 36; d.maxHp = 500; d.hp = 500; d.attackRange = 60; d.summonTimer = 25; players[h.owner].units.push(d); beep(360, 0.12, 'sawtooth', 0.07); }
+          else { if (h.mp < 90) return; h.mp -= 90; const d = new Unit(h.x + 28, h.y + 12, h.owner, 'demon', getUnitDeps()); d.dps = 36; d.maxHp = 500; d.hp = 500; d.attackRange = 60; d.summonTimer = 25; players[h.owner].units.push(d); beep(360, 0.12, 'sawtooth', 0.07); }
           h.cd3 = h.cdM3; if (h.owner === 0) setHeroUI(h);
         }
       }
@@ -529,7 +537,7 @@ await import("./ai.js");
         for (let i = 0; i < 3; i++) {
           players[i].startX = pos[i].x; players[i].startY = pos[i].y;
           const HQ = new Structure(pos[i].x, pos[i].y, i, 'hq', false); players[i].structures.push(HQ);
-          for (let k = 0; k < 6; k++) { const w = new Unit(HQ.x + (k % 3) * 24, HQ.y + 60 + Math.floor(k / 3) * 24, i, 'worker'); players[i].units.push(w); w.role = (k % 2 === 0) ? 'rice' : 'water'; }
+          for (let k = 0; k < 6; k++) { const w = new Unit(HQ.x + (k % 3) * 24, HQ.y + 60 + Math.floor(k / 3) * 24, i, 'worker', getUnitDeps()); players[i].units.push(w); w.role = (k % 2 === 0) ? 'rice' : 'water'; }
           const cls = (i === 0 ? playerClass : (Math.random() < 0.34 ? 'paladin' : (Math.random() < 0.67 ? 'rogue' : 'archmage')));
           spawnHero(i, HQ.x + 80, HQ.y - 20, cls);
           riceNodes.push(new ResourceNode(HQ.x + 220, HQ.y + 160, 'rice')); waterNodes.push(new ResourceNode(HQ.x - 220, HQ.y + 160, 'water'));
@@ -581,7 +589,7 @@ globalThis.drawHp = drawHp;
         clearVisible(); for (const s of players[0].structures) revealCircle(s.x, s.y, 520); for (const u of players[0].units) revealCircle(u.x, u.y, 480);
         if (!globalThis.paused) {
           const sp = 900 / world.zoom; if (input.keys['w'] || input.keys['ц']) world.camY -= sp * dt; if (input.keys['s'] || input.keys['ы']) world.camY += sp * dt; if (input.keys['a'] || input.keys['ф']) world.camX -= sp * dt; if (input.keys['d'] || input.keys['в']) world.camX += sp * dt; clampCam();
-          for (const p of players) { for (const s of p.structures) s.update(dt); for (const u of p.units) u.update(dt); if (p.ai) aiThink(dt, players.indexOf(p)); }
+          for (const p of players) { for (const s of p.structures) s.update(dt); for (const u of p.units) u.update(dt); if (p.ai) aiThink(dt, players.indexOf(p), getDeps()); }
           for (const n of neutral.units) { n.update(dt); if (n.dead && !n.awarded) { if (n.lastHitBy != null && n.lastHitBy >= 0) { heroGainFromNeutral(n.lastHitBy, n.tier); }
             if (n.group && n.group.dropsLeft > 0) { drops.push(new ItemDrop(n.x, n.y, lootFromTier(n.tier))); n.group.dropsLeft--; }
             n.awarded = true; } }

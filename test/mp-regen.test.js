@@ -7,6 +7,8 @@ global.enemiesFor = () => [];
 global.dist2 = () => 0;
 global.players = [];
 global.neutral = { units: [] };
+global.riceNodes = [{ id: 1, x: 10, y: 0 }];
+global.waterNodes = [];
 
 // mp regenerates up to max
 (() => {
@@ -29,3 +31,23 @@ global.neutral = { units: [] };
 })();
 
 console.log('MP regen tests passed.');
+
+// Unit.updateWorker uses injected deps
+(() => {
+  global.rand = () => { throw new Error('global rand used'); };
+  const fakeRand = () => 0;
+  let blocked = 0;
+  const isBlocked = () => { blocked++; return false; };
+  const players = [
+    null,
+    { structures: [{ kind: 'square', x: 0, y: 0 }], res: { rice: 0, water: 0 } },
+  ];
+  const u = new Unit(0, 0, 1, 'worker', { rand: fakeRand, isBlocked, players });
+  u.role = 'rice';
+  u.state = 'idle';
+  u.updateWorker(0.1); // sets destination
+  u.updateWorker(1);   // moves and calls isBlocked
+  assert.strictEqual(u.destX, 10);
+  assert.strictEqual(u.destY, 0);
+  assert.ok(blocked > 0);
+})();

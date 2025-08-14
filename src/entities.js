@@ -1,16 +1,16 @@
 /* ==== Entities ==== */
 let nextId = 1;
 
-function moveEntity(e, dx, dy, v, dt) {
+function moveEntity(e, dx, dy, v, dt, isBlocked = globalThis.isBlocked) {
   const d = Math.hypot(dx, dy);
   if (d <= 0) return;
   const nx = e.x + (dx / d) * v * dt, ny = e.y + (dy / d) * v * dt;
-  if (!globalThis.isBlocked(nx, ny)) { e.x = nx; e.y = ny; return; }
+  if (!isBlocked(nx, ny)) { e.x = nx; e.y = ny; return; }
   const ux = -dy / d, uy = dx / d;
   const sx = e.x + ux * v * dt, sy = e.y + uy * v * dt;
-  if (!globalThis.isBlocked(sx, sy)) { e.x = sx; e.y = sy; return; }
+  if (!isBlocked(sx, sy)) { e.x = sx; e.y = sy; return; }
   const sx2 = e.x - ux * v * dt, sy2 = e.y - uy * v * dt;
-  if (!globalThis.isBlocked(sx2, sy2)) { e.x = sx2; e.y = sy2; }
+  if (!isBlocked(sx2, sy2)) { e.x = sx2; e.y = sy2; }
 }
 
 export class Entity {
@@ -46,8 +46,13 @@ export class Entity {
 }
 
 export class Unit extends Entity {
-  constructor(x, y, owner, type = 'worker') {
+  constructor(x, y, owner, type = 'worker', deps = {}) {
     super(x, y, owner);
+    this.deps = {
+      isBlocked: deps.isBlocked || globalThis.isBlocked || (() => false),
+      rand: deps.rand || globalThis.rand || Math.random,
+      players: deps.players || globalThis.players || [],
+    };
     this.type = type;
     this.radius = 12;
     this.speed = 150;
@@ -103,7 +108,7 @@ export class Unit extends Entity {
   }
   updateWorker(dt) {
     if (this.role !== 'rice' && this.role !== 'water') return;
-    const P = globalThis.players[this.owner];
+    const P = this.deps.players[this.owner];
     const HQ = P.structures.find(s => s.kind === 'hq' || s.kind === 'square');
     if (!HQ) { this.state = 'idle'; this.noteTimer = 2; return; }
     const node = (this.role === 'rice' ? nearestNode('rice', P) : nearestNode('water', P));
@@ -111,19 +116,19 @@ export class Unit extends Entity {
     if (this.nodeId !== node.id && this.state !== 'to_hq') {
       this.nodeId = node.id;
       this.state = 'to_node';
-      this.destX = node.x + globalThis.rand(-24, 24);
-      this.destY = node.y + globalThis.rand(-24, 24);
+      this.destX = node.x + this.deps.rand(-24, 24);
+      this.destY = node.y + this.deps.rand(-24, 24);
     }
     if (this.state === 'idle') {
       this.state = 'to_node';
-      this.destX = node.x + globalThis.rand(-24, 24);
-      this.destY = node.y + globalThis.rand(-24, 24);
+      this.destX = node.x + this.deps.rand(-24, 24);
+      this.destY = node.y + this.deps.rand(-24, 24);
     }
     if (this.state === 'to_node') {
       const dx = this.destX - this.x, dy = this.destY - this.y, d = Math.hypot(dx, dy);
       if (d > 2) {
         const v = this.getCurrentSpeed();
-        moveEntity(this, dx, dy, v, dt);
+        moveEntity(this, dx, dy, v, dt, this.deps.isBlocked);
       } else {
         this.state = 'harvest';
         this.workTimer = (this.role === 'rice' ? 2.2 : 2.6);
@@ -134,15 +139,15 @@ export class Unit extends Entity {
       if (this.workTimer <= 0) {
         this.carry = (this.role === 'rice' ? 12 : 9);
         this.state = 'to_hq';
-        this.destX = HQ.x + globalThis.rand(-32, 32);
-        this.destY = HQ.y + globalThis.rand(-32, 32);
+        this.destX = HQ.x + this.deps.rand(-32, 32);
+        this.destY = HQ.y + this.deps.rand(-32, 32);
       }
     }
     if (this.state === 'to_hq') {
       const dx = this.destX - this.x, dy = this.destY - this.y, d = Math.hypot(dx, dy);
       if (d > 2) {
         const v = this.getCurrentSpeed();
-        moveEntity(this, dx, dy, v, dt);
+        moveEntity(this, dx, dy, v, dt, this.deps.isBlocked);
       } else {
         if (this.carry > 0) {
           if (this.role === 'rice') P.res.rice += this.carry;
@@ -151,14 +156,14 @@ export class Unit extends Entity {
           this.carry = 0;
         }
         this.state = 'to_node';
-        this.destX = node.x + globalThis.rand(-24, 24);
-        this.destY = node.y + globalThis.rand(-24, 24);
+        this.destX = node.x + this.deps.rand(-24, 24);
+        this.destY = node.y + this.deps.rand(-24, 24);
       }
     }
   }
   updateRetreat(dt) {
     if (this.owner !== 0 && !this.isHero) {
-      const HQ = globalThis.players[this.owner].structures.find(s => s.kind === 'hq' || s.kind === 'square');
+      const HQ = this.deps.players[this.owner].structures.find(s => s.kind === 'hq' || s.kind === 'square');
       if (this.hp / this.maxHp < 0.35) {
         this.retreat = true;
         if (HQ) this.setDest(HQ.x, HQ.y + 40);
@@ -172,7 +177,7 @@ export class Unit extends Entity {
     const d = Math.hypot(dx, dy);
     if (d > this.attackRange) {
       const v = this.getCurrentSpeed();
-      moveEntity(this, dx, dy, v, dt);
+        moveEntity(this, dx, dy, v, dt, this.deps.isBlocked);
     } else {
       this.attackCd -= dt;
       if (this.attackCd <= 0) {
@@ -191,7 +196,7 @@ export class Unit extends Entity {
     const d = Math.hypot(dx, dy);
     if (d > 2) {
       const v = this.getCurrentSpeed();
-      moveEntity(this, dx, dy, v, dt);
+      moveEntity(this, dx, dy, v, dt, this.deps.isBlocked);
     }
   }
   update(dt) {
@@ -230,7 +235,7 @@ export class Unit extends Entity {
       if (!target || !target.isGhost) { this.state = 'idle'; this.buildTargetId = null; }
       else {
         const dx = target.x - this.x, dy = target.y - this.y, d = Math.hypot(dx, dy);
-        if (d > 40) { const v = this.getCurrentSpeed(); moveEntity(this, dx, dy, v, dt); }
+        if (d > 40) { const v = this.getCurrentSpeed(); moveEntity(this, dx, dy, v, dt, this.deps.isBlocked); }
         else { target.hp += 30 * dt; if (target.hp >= target.maxHp) { target.isGhost = false; target.hp = 520; target.maxHp = 520; this.state = 'idle'; this.buildTargetId = null; if (typeof globalThis.beep === 'function' && !globalThis.muted) globalThis.beep(300, 0.08, 'triangle', 0.05); } }
       }
       return;
