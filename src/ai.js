@@ -35,6 +35,7 @@ function aiInitPlan(P, level = 'normal') {
     nextBuild: 0,
     aggression: cfg.aggression,
     buildInterval: cfg.buildInterval,
+    buildTimer: 0,
     // Additional fields for extended scenarios
     scoutTimer: 0,
     finalPush: false,
@@ -80,6 +81,10 @@ class AIController {
   think(dt) {
     if (!this.player.ai) return;
     if (!this.behavior || !this.player.aiPlan) this.init();
+    if (this.player.aiPlan.buildTimer > 0) {
+      this.player.aiPlan.buildTimer -= dt;
+      if (this.player.aiPlan.buildTimer < 0) this.player.aiPlan.buildTimer = 0;
+    }
     this.behavior.tick({ dt, controller: this });
   }
 
@@ -102,19 +107,35 @@ class AIController {
   buildOpenings() {
     const P = this.player;
     const { COSTS, placeGhost, isBlocked } = this.deps;
+    if (P.aiPlan.buildTimer > 0) return;
     const HQ = P.structures.find(s => s.kind === 'hq' || s.kind === 'square');
     if (P.aiPlan.nextBuild < P.aiPlan.open.length && HQ) {
+      const worker = P.units.find(u => u.type === 'worker' && u.state !== 'build');
+      if (!worker) return;
       const kind = P.aiPlan.open[P.aiPlan.nextBuild];
       const cost = COSTS[kind];
       if (P.res.rice >= cost.rice && P.res.water >= cost.water) {
-        const dx = (kind === 'well') ? -160 : (Math.random() < 0.5 ? 180 : -180);
-        const dy = (kind === 'well') ? 120 : (Math.random() < 0.5 ? 160 : -160);
-        const px = HQ.x + dx, py = HQ.y + dy;
-        if (!isBlocked(px, py) && placeGhost(this.id, px, py, kind)) {
+        const offsets = (kind === 'well')
+          ? [[-160, 120], [160, 120], [-160, -120], [160, -120]]
+          : [[180, 160], [180, -160], [-180, 160], [-180, -160]];
+        let placed = false;
+        let px = 0, py = 0;
+        for (const [dx, dy] of offsets) {
+          px = HQ.x + dx;
+          py = HQ.y + dy;
+          if (!isBlocked(px, py) && placeGhost(this.id, px, py, kind)) {
+            placed = true;
+            break;
+          }
+        }
+        if (placed) {
           P.aiPlan.nextBuild++;
+          P.aiPlan.buildTimer = P.aiPlan.buildInterval;
           const g = P.structures.find(s => s.isGhost && s.kind === kind && Math.hypot(s.x - px, s.y - py) < 10);
-          const w = P.units.find(u => u.type === 'worker');
-          if (g && w) { w.state = 'build'; w.buildTargetId = g.id; }
+          if (g) {
+            worker.state = 'build';
+            worker.buildTargetId = g.id;
+          }
         }
       }
     }
@@ -129,6 +150,12 @@ class AIController {
       if (P.res.rice >= 50 && P.res.water >= 12 && P.units.filter(u => !u.dead && !u.isHero).length < POP_CAP) {
         HQ.queue.push('worker');
       }
+    }
+    const unassigned = P.units.filter(u => u.type === 'worker' && (u.role === null || u.role === undefined));
+    for (const worker of unassigned) {
+      const resType = P.res.rice < P.res.water ? 'rice' : 'water';
+      worker.role = resType;
+      worker.state = 'idle';
     }
   }
 
