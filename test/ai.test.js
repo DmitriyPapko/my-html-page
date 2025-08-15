@@ -394,4 +394,45 @@ const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
   assert.ok(ai.player.aiPlan.aggression < base);
 })();
 
+// think continues executing after earlier failures
+(() => {
+  const worker1 = { id: 1, type: 'worker', state: 'idle' };
+  const worker2 = { id: 2, type: 'worker', state: 'idle' };
+  const barr = { kind: 'barracks', queue: [], isGhost: false };
+  const ghost = { id: 3, kind: 'range', isGhost: true, progress: 0 };
+  const players = [
+    { units: [], structures: [], hero: null, ai: false },
+    {
+      units: [worker1, worker2],
+      structures: [{ kind: 'square', queue: [] }, barr, ghost],
+      hero: null,
+      ai: true,
+      aiPlan: null,
+      res: { rice: 0, water: 0 },
+    },
+  ];
+  const deps = {
+    players,
+    COSTS: { square: { rice: 0, water: 0 }, well: { rice: 30, water: 30 } },
+    POP_CAP: 10,
+    placeGhost: () => false,
+    isBlocked: () => true,
+    neutral: { camps: [] },
+    dist2,
+    packPower,
+    campPower,
+  };
+  const ai = new AIController(1, deps);
+  ai.init();
+  ai.player.aiPlan.open = ['well'];
+  ai.player.aiPlan.minReserve = { rice: 0, water: 0 };
+  ai.think(1);
+  assert.strictEqual(barr.queue[0], 'soldier');
+  const roles = [worker1.role, worker2.role].sort();
+  assert.deepStrictEqual(roles, ['rice', 'water']);
+  const builders = [worker1, worker2].filter(w => w.state === 'build');
+  assert.strictEqual(builders.length, 1);
+  assert.strictEqual(builders[0].buildTargetId, ghost.id);
+})();
+
 console.log('All tests passed.');
