@@ -1,4 +1,4 @@
-import { drawSprite } from './sprites.js';
+import { drawSprite, SPRITES } from './sprites.js';
 import { WATER, RICE } from './config/visual.js';
 
 /* ==== Terrain generation and blockers ==== */
@@ -27,11 +27,15 @@ const tctx = treeBase.getContext('2d');
 tctx.imageSmoothingEnabled = false;
 drawSprite(tctx, 'tree', 8, 8);
 
-const waterBase = document.createElement('canvas');
-waterBase.width = 16; waterBase.height = 16;
-const wbctx = waterBase.getContext('2d');
-wbctx.imageSmoothingEnabled = false;
-drawSprite(wbctx, 'water', 8, 8);
+const waterBase = [];
+for (let f = 0; f < SPRITES.water.length; f++) {
+  const c = document.createElement('canvas');
+  c.width = 16; c.height = 16;
+  const wbctx = c.getContext('2d');
+  wbctx.imageSmoothingEnabled = false;
+  drawSprite(wbctx, 'water', 8, 8, { frame: f });
+  waterBase.push(c);
+}
 
 function hash(x, y) {
   let h = x * 374761393 + y * 668265263;
@@ -95,7 +99,8 @@ export function drawBlockers() {
       drawShadow(topLeft.x + size / 2, topLeft.y + size * 0.75, size * 0.5);
       ctx.drawImage(treeBase, dx, dy, size, size);
     } else {
-      ctx.drawImage(waterBase, dx, dy, size, size);
+      const frame = Math.floor((globalThis.simTime || 0) * WATER.animSpeed) % waterBase.length;
+      ctx.drawImage(waterBase[frame], dx, dy, size, size);
     }
   }
 }

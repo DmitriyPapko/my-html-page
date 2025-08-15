@@ -33,22 +33,42 @@ export const SPRITES = {
     "gggggggggggggggg"
   ],
   water: [
-    "wwWWwwWWwwWWwwWW",
-    "WWwwWWwwWWwwWWww",
-    "wwWWwwWWwwWWwwWW",
-    "WWwwWWwwWWwwWWww",
-    "wwWWwwWWwwWWwwWW",
-    "WWwwWWwwWWwwWWww",
-    "wwWWwwWWwwWWwwWW",
-    "WWwwWWwwWWwwWWww",
-    "wwWWwwWWwwWWwwWW",
-    "WWwwWWwwWWwwWWww",
-    "wwWWwwWWwwWWwwWW",
-    "WWwwWWwwWWwwWWww",
-    "wwWWwwWWwwWWwwWW",
-    "WWwwWWwwWWwwWWww",
-    "wwWWwwWWwwWWwwWW",
-    "WWwwWWwwWWwwWWww"
+    [
+      "wwWWwwWWwwWWwwWW",
+      "WWwwWWwwWWwwWWww",
+      "wwWWwwWWwwWWwwWW",
+      "WWwwWWwwWWwwWWww",
+      "wwWWwwWWwwWWwwWW",
+      "WWwwWWwwWWwwWWww",
+      "wwWWwwWWwwWWwwWW",
+      "WWwwWWwwWWwwWWww",
+      "wwWWwwWWwwWWwwWW",
+      "WWwwWWwwWWwwWWww",
+      "wwWWwwWWwwWWwwWW",
+      "WWwwWWwwWWwwWWww",
+      "wwWWwwWWwwWWwwWW",
+      "WWwwWWwwWWwwWWww",
+      "wwWWwwWWwwWWwwWW",
+      "WWwwWWwwWWwwWWww"
+    ],
+    [
+      "WWwwWWwwWWwwWWww",
+      "wwWWwwWWwwWWwwWW",
+      "WWwwWWwwWWwwWWww",
+      "wwWWwwWWwwWWwwWW",
+      "WWwwWWwwWWwwWWww",
+      "wwWWwwWWwwWWwwWW",
+      "WWwwWWwwWWwwWWww",
+      "wwWWwwWWwwWWwwWW",
+      "WWwwWWwwWWwwWWww",
+      "wwWWwwWWwwWWwwWW",
+      "WWwwWWwwWWwwWWww",
+      "wwWWwwWWwwWWwwWW",
+      "WWwwWWwwWWwwWWww",
+      "wwWWwwWWwwWWwwWW",
+      "WWwwWWwwWWwwWWww",
+      "wwWWwwWWwwWWwwWW"
+    ]
   ],
   tree: [
     ".......T.......",
@@ -346,7 +366,7 @@ function stableKey(obj) {
 }
 
 export function drawSprite(ctx, name, x, y, opts = {}) {
-  const spr = SPRITES[name];
+  let spr = SPRITES[name];
   if (!spr) return;
   const {
     scale = 1,
@@ -356,13 +376,17 @@ export function drawSprite(ctx, name, x, y, opts = {}) {
     rotate = 0,
     anchor = 'center',
     shadow = false,
+    frame = 0,
     override = {}
   } = opts;
+  if (Array.isArray(spr[0])) {
+    spr = spr[frame % spr.length];
+  }
   const w = spr[0].length;
   const h = spr.length;
   let canvas = null;
   if (!flipX && !flipY && !rotate && alpha === 1 && !shadow) {
-    const key = name + '@' + scale + '@' + stableKey(override);
+    const key = name + '@' + frame + '@' + scale + '@' + stableKey(override);
     canvas = CACHE.get(key);
     if (!canvas) {
       canvas = document.createElement('canvas');
