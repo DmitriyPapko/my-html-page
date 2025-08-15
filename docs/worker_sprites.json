@@ -1,0 +1,308 @@
+{
+  "image": "docs/worker_sprites.png",
+  "tile": {
+    "w": 32,
+    "h": 32
+  },
+  "frames": {
+    "worker_idle_0": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_idle_1": {
+      "frame": {
+        "x": 32,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_walk_0": {
+      "frame": {
+        "x": 0,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_walk_1": {
+      "frame": {
+        "x": 32,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_walk_2": {
+      "frame": {
+        "x": 64,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_walk_3": {
+      "frame": {
+        "x": 96,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_walk_4": {
+      "frame": {
+        "x": 128,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_walk_5": {
+      "frame": {
+        "x": 160,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_gather_0": {
+      "frame": {
+        "x": 0,
+        "y": 64,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_gather_1": {
+      "frame": {
+        "x": 32,
+        "y": 64,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_gather_2": {
+      "frame": {
+        "x": 64,
+        "y": 64,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_gather_3": {
+      "frame": {
+        "x": 96,
+        "y": 64,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_attack_0": {
+      "frame": {
+        "x": 0,
+        "y": 96,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_attack_1": {
+      "frame": {
+        "x": 32,
+        "y": 96,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_attack_2": {
+      "frame": {
+        "x": 64,
+        "y": 96,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_attack_3": {
+      "frame": {
+        "x": 96,
+        "y": 96,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_death_0": {
+      "frame": {
+        "x": 0,
+        "y": 128,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_death_1": {
+      "frame": {
+        "x": 32,
+        "y": 128,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_death_2": {
+      "frame": {
+        "x": 64,
+        "y": 128,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_death_3": {
+      "frame": {
+        "x": 96,
+        "y": 128,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_death_4": {
+      "frame": {
+        "x": 128,
+        "y": 128,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    },
+    "worker_death_5": {
+      "frame": {
+        "x": 160,
+        "y": 128,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 24
+      }
+    }
+  },
+  "animations": {
+    "worker_idle": [
+      "worker_idle_0",
+      "worker_idle_1"
+    ],
+    "worker_walk": [
+      "worker_walk_0",
+      "worker_walk_1",
+      "worker_walk_2",
+      "worker_walk_3",
+      "worker_walk_4",
+      "worker_walk_5"
+    ],
+    "worker_gather": [
+      "worker_gather_0",
+      "worker_gather_1",
+      "worker_gather_2",
+      "worker_gather_3"
+    ],
+    "worker_attack": [
+      "worker_attack_0",
+      "worker_attack_1",
+      "worker_attack_2",
+      "worker_attack_3"
+    ],
+    "worker_death": [
+      "worker_death_0",
+      "worker_death_1",
+      "worker_death_2",
+      "worker_death_3",
+      "worker_death_4",
+      "worker_death_5"
+    ]
+  },
+  "version": 1
+}
