@@ -70,6 +70,7 @@ class AIController {
       new Action(this.buildOpenings.bind(this)),
       new Action(this.maintainWorkers.bind(this)),
       new Action(this.redistributeWorkers.bind(this)),
+      new Action(this.manageIdleUnits.bind(this)),
       new Action(this.trainUnits.bind(this)),
       new Action(this.heroActions.bind(this)),
       new Action(this.earlyArmyFarm.bind(this)),
@@ -212,6 +213,28 @@ class AIController {
     return true;
   }
 
+  manageIdleUnits() {
+    const P = this.player;
+    const { players } = this.deps;
+    const idle = P.units.filter(
+      u => u.type !== 'worker' && !u.isHero && (!u.state || u.state === 'idle') && !u.target
+    );
+    if (!idle.length) return false;
+    const enemies = players.filter(
+      (pl, idx) =>
+        idx !== this.id && !(pl.teamId !== undefined && P.teamId !== undefined && pl.teamId === P.teamId)
+    );
+    const target = enemies.flatMap(pl => pl.units.concat(pl.structures)).find(t => t && !t.isGhost);
+    if (target) {
+      idle.forEach(u => {
+        if (typeof u.setTarget === 'function') u.setTarget(target);
+        u.state = 'attack';
+      });
+      return true;
+    }
+    return false;
+  }
+
   trainUnits({ dt = 0 } = {}) {
     const P = this.player;
     const { POP_CAP } = this.deps;
@@ -263,7 +286,9 @@ class AIController {
     const { players } = this.deps;
     const HQ = P.structures.find(s => s.kind === 'hq' || s.kind === 'square');
     if (!HQ) return false;
-    const enemyUnits = players[0] ? players[0].units.filter(u => !u.dead) : [];
+    const enemyUnits = players
+      .filter((pl, idx) => idx !== this.id && !(pl.teamId !== undefined && P.teamId !== undefined && pl.teamId === P.teamId))
+      .flatMap(pl => pl.units.filter(u => !u.dead));
     const threat = enemyUnits.find(e => Math.hypot(e.x - HQ.x, e.y - HQ.y) < 200);
     if (P.res.rice < 50 || P.res.water < 30 || threat) {
       const army = P.units.filter(u => u.type !== 'worker' && !u.isHero);
@@ -309,7 +334,9 @@ class AIController {
   skirmish() {
     const P = this.player;
     const { players } = this.deps;
-    const enemy = players[0];
+    const enemy = players.find(
+      (pl, idx) => idx !== this.id && !(pl.teamId !== undefined && P.teamId !== undefined && pl.teamId === P.teamId)
+    );
     if (!enemy) return false;
     const army = P.units.filter(u => u.type !== 'worker' && !u.isHero);
     if (army.length < 2) return false;
@@ -387,7 +414,9 @@ class AIController {
     const army = P.units.filter(u => u.type !== 'worker' && !u.isHero);
     if (!army.length) return false;
     const enemies = players
-      .filter((_, i) => i !== this.id)
+      .filter((pl, i) =>
+        i !== this.id && !(pl.teamId !== undefined && P.teamId !== undefined && pl.teamId === P.teamId)
+      )
       .flatMap(pl => pl.units.filter(u => !u.dead));
     const ourP = packPower(army);
     const enemyP = packPower(enemies);
@@ -422,6 +451,7 @@ class AIController {
       let bestDef = Infinity;
       players.forEach((pl, idx) => {
         if (idx === this.id) return;
+        if (pl.teamId !== undefined && P.teamId !== undefined && pl.teamId === P.teamId) return;
         const check = target => {
           if (!target || target.isGhost) return;
           const def = target.hp || target.defense || 0;
@@ -442,13 +472,30 @@ class AIController {
 
   completeGhosts() {
     const P = this.player;
-    const ghost = P.structures.find(s => s.isGhost);
-    if (ghost) {
-      const w = P.units.find(u => u.type === 'worker' && u.state !== 'build');
-      if (w) { w.state = 'build'; w.buildTargetId = ghost.id; return true; }
-      return false;
+    const ghosts = P.structures.filter(s => s.isGhost);
+    let acted = false;
+    for (const g of ghosts) {
+      if (g.progress >= 100) {
+        g.isGhost = false;
+        const w = P.units.find(u => u.id === g.buildWorkerId);
+        if (w) {
+          w.state = 'idle';
+          delete w.buildTargetId;
+        }
+        delete g.buildWorkerId;
+        acted = true;
+        continue;
+      }
+      let w = P.units.find(u => u.type === 'worker' && u.state !== 'build');
+      if (!w && g.buildWorkerId) w = P.units.find(u => u.id === g.buildWorkerId);
+      if (w) {
+        w.state = 'build';
+        w.buildTargetId = g.id;
+        g.buildWorkerId = w.id;
+        acted = true;
+      }
     }
-    return false;
+    return acted;
   }
 }
 
