@@ -1,11 +1,11 @@
 {
-  "image": "docs/mage_sprites.png",
+  "image": "docs/archer_sprites.png",
   "tile": {
     "w": 32,
     "h": 32
   },
   "frames": {
-    "mage_idle_0": {
+    "archer_idle_0": {
       "frame": {
         "x": 0,
         "y": 0,
@@ -17,7 +17,7 @@
         "y": 26
       }
     },
-    "mage_idle_1": {
+    "archer_idle_1": {
       "frame": {
         "x": 32,
         "y": 0,
@@ -29,7 +29,7 @@
         "y": 26
       }
     },
-    "mage_idle_2": {
+    "archer_idle_2": {
       "frame": {
         "x": 64,
         "y": 0,
@@ -41,7 +41,7 @@
         "y": 26
       }
     },
-    "mage_idle_3": {
+    "archer_idle_3": {
       "frame": {
         "x": 96,
         "y": 0,
@@ -53,7 +53,7 @@
         "y": 26
       }
     },
-    "mage_walk_0": {
+    "archer_walk_0": {
       "frame": {
         "x": 0,
         "y": 32,
@@ -65,7 +65,7 @@
         "y": 26
       }
     },
-    "mage_walk_1": {
+    "archer_walk_1": {
       "frame": {
         "x": 32,
         "y": 32,
@@ -77,7 +77,7 @@
         "y": 26
       }
     },
-    "mage_walk_2": {
+    "archer_walk_2": {
       "frame": {
         "x": 64,
         "y": 32,
@@ -89,7 +89,7 @@
         "y": 26
       }
     },
-    "mage_walk_3": {
+    "archer_walk_3": {
       "frame": {
         "x": 96,
         "y": 32,
@@ -101,7 +101,7 @@
         "y": 26
       }
     },
-    "mage_walk_4": {
+    "archer_walk_4": {
       "frame": {
         "x": 128,
         "y": 32,
@@ -113,7 +113,7 @@
         "y": 26
       }
     },
-    "mage_walk_5": {
+    "archer_walk_5": {
       "frame": {
         "x": 160,
         "y": 32,
@@ -125,7 +125,7 @@
         "y": 26
       }
     },
-    "mage_cast_0": {
+    "archer_attack_0": {
       "frame": {
         "x": 0,
         "y": 64,
@@ -137,7 +137,7 @@
         "y": 26
       }
     },
-    "mage_cast_1": {
+    "archer_attack_1": {
       "frame": {
         "x": 32,
         "y": 64,
@@ -149,7 +149,7 @@
         "y": 26
       }
     },
-    "mage_cast_2": {
+    "archer_attack_2": {
       "frame": {
         "x": 64,
         "y": 64,
@@ -161,7 +161,7 @@
         "y": 26
       }
     },
-    "mage_cast_3": {
+    "archer_attack_3": {
       "frame": {
         "x": 96,
         "y": 64,
@@ -173,7 +173,7 @@
         "y": 26
       }
     },
-    "mage_cast_4": {
+    "archer_attack_4": {
       "frame": {
         "x": 128,
         "y": 64,
@@ -185,7 +185,7 @@
         "y": 26
       }
     },
-    "mage_cast_5": {
+    "archer_attack_5": {
       "frame": {
         "x": 160,
         "y": 64,
@@ -197,7 +197,7 @@
         "y": 26
       }
     },
-    "mage_attack_0": {
+    "archer_death_0": {
       "frame": {
         "x": 0,
         "y": 96,
@@ -209,7 +209,7 @@
         "y": 26
       }
     },
-    "mage_attack_1": {
+    "archer_death_1": {
       "frame": {
         "x": 32,
         "y": 96,
@@ -221,7 +221,7 @@
         "y": 26
       }
     },
-    "mage_attack_2": {
+    "archer_death_2": {
       "frame": {
         "x": 64,
         "y": 96,
@@ -233,7 +233,7 @@
         "y": 26
       }
     },
-    "mage_attack_3": {
+    "archer_death_3": {
       "frame": {
         "x": 96,
         "y": 96,
@@ -245,7 +245,7 @@
         "y": 26
       }
     },
-    "mage_attack_4": {
+    "archer_death_4": {
       "frame": {
         "x": 128,
         "y": 96,
@@ -257,82 +257,10 @@
         "y": 26
       }
     },
-    "mage_attack_5": {
+    "archer_death_5": {
       "frame": {
         "x": 160,
         "y": 96,
-        "w": 32,
-        "h": 32
-      },
-      "anchor": {
-        "x": 16,
-        "y": 26
-      }
-    },
-    "mage_death_0": {
-      "frame": {
-        "x": 0,
-        "y": 128,
-        "w": 32,
-        "h": 32
-      },
-      "anchor": {
-        "x": 16,
-        "y": 26
-      }
-    },
-    "mage_death_1": {
-      "frame": {
-        "x": 32,
-        "y": 128,
-        "w": 32,
-        "h": 32
-      },
-      "anchor": {
-        "x": 16,
-        "y": 26
-      }
-    },
-    "mage_death_2": {
-      "frame": {
-        "x": 64,
-        "y": 128,
-        "w": 32,
-        "h": 32
-      },
-      "anchor": {
-        "x": 16,
-        "y": 26
-      }
-    },
-    "mage_death_3": {
-      "frame": {
-        "x": 96,
-        "y": 128,
-        "w": 32,
-        "h": 32
-      },
-      "anchor": {
-        "x": 16,
-        "y": 26
-      }
-    },
-    "mage_death_4": {
-      "frame": {
-        "x": 128,
-        "y": 128,
-        "w": 32,
-        "h": 32
-      },
-      "anchor": {
-        "x": 16,
-        "y": 26
-      }
-    },
-    "mage_death_5": {
-      "frame": {
-        "x": 160,
-        "y": 128,
         "w": 32,
         "h": 32
       },
@@ -343,43 +271,35 @@
     }
   },
   "animations": {
-    "mage_idle": [
-      "mage_idle_0",
-      "mage_idle_1",
-      "mage_idle_2",
-      "mage_idle_3"
+    "archer_idle": [
+      "archer_idle_0",
+      "archer_idle_1",
+      "archer_idle_2",
+      "archer_idle_3"
     ],
-    "mage_walk": [
-      "mage_walk_0",
-      "mage_walk_1",
-      "mage_walk_2",
-      "mage_walk_3",
-      "mage_walk_4",
-      "mage_walk_5"
+    "archer_walk": [
+      "archer_walk_0",
+      "archer_walk_1",
+      "archer_walk_2",
+      "archer_walk_3",
+      "archer_walk_4",
+      "archer_walk_5"
     ],
-    "mage_cast": [
-      "mage_cast_0",
-      "mage_cast_1",
-      "mage_cast_2",
-      "mage_cast_3",
-      "mage_cast_4",
-      "mage_cast_5"
+    "archer_attack": [
+      "archer_attack_0",
+      "archer_attack_1",
+      "archer_attack_2",
+      "archer_attack_3",
+      "archer_attack_4",
+      "archer_attack_5"
     ],
-    "mage_attack": [
-      "mage_attack_0",
-      "mage_attack_1",
-      "mage_attack_2",
-      "mage_attack_3",
-      "mage_attack_4",
-      "mage_attack_5"
-    ],
-    "mage_death": [
-      "mage_death_0",
-      "mage_death_1",
-      "mage_death_2",
-      "mage_death_3",
-      "mage_death_4",
-      "mage_death_5"
+    "archer_death": [
+      "archer_death_0",
+      "archer_death_1",
+      "archer_death_2",
+      "archer_death_3",
+      "archer_death_4",
+      "archer_death_5"
     ]
   },
   "version": 1
