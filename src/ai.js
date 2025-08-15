@@ -453,13 +453,13 @@ class AIController {
         if (idx === this.id) return;
         if (pl.teamId !== undefined && P.teamId !== undefined && pl.teamId === P.teamId) return;
         const check = target => {
-          if (!target || target.isGhost) return;
+          if (!target || target.isGhost || target.dead) return;
           const def = target.hp || target.defense || 0;
           if (def < bestDef) { bestDef = def; best = target; }
         };
         check(pl.hero && !pl.hero.dead ? pl.hero : null);
-        pl.structures.forEach(check);
-        pl.units.forEach(u => { if (!u.isHero) check(u); });
+        pl.structures.forEach(s => { if (!s.dead && !s.isGhost) check(s); });
+        pl.units.forEach(u => { if (!u.isHero && !u.dead && !u.isGhost) check(u); });
       });
       if (best) {
         army.forEach(u => { if (!u.retreat) u.setTarget(best); });
