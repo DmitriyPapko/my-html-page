@@ -2,13 +2,13 @@ import { drawSprite, nextFrame, initSprites, initWorkerAtlas, initMageAtlas, ini
 import { Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, getById, enemiesFor, allUnits, allStructures, nearestNode, lootFromTier } from "./entities.js";
 import state from './state.js';
 import { AIController } from './ai.js';
-import { FireAuraEffect } from "./effects/FireAuraEffect.js";
+import FireAuraEffect from "./effects/FireAuraEffect.js";
+import { clamp, rand, dist2 } from './utils.js';
+import BALANCE from './config/balance.js';
+import { tryCast as heroTryCast } from './hero.js';
 
 /* ==== Helpers ==== */
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const rand = (a, b) => a + Math.random() * (b - a);
 state.rand = rand;
-const dist2 = (x1, y1, x2, y2) => { const dx = x2 - x1, dy = y2 - y1; return dx * dx + dy * dy; };
 
 /* ==== Canvas & camera ==== */
 const cvs = document.getElementById('game'), ctx = cvs.getContext('2d'); ctx.imageSmoothingEnabled = false;
@@ -318,7 +318,14 @@ function drawWeather(dt) {
           setTimeout(() => { hero.dps -= 10; }, 20000);
         } else if (itemKind === 'scroll_fire_aura') {
           if (remove) return;
-          hero.effects.push(new FireAuraEffect({ radius: 100, dpsPerTick: 10, tickMs: 1000, durationMs: 20000 }));
+          const cfg = BALANCE.FIRE_AURA;
+          hero.effects.push(new FireAuraEffect({
+            radius: cfg.RADIUS,
+            dpsPerTick: cfg.DPS_PER_TICK,
+            tickMs: cfg.TICK_MS,
+            durationMs: cfg.DURATION_MS,
+            enemiesFor
+          }));
           if (typeof beep === 'function' && !state.muted) beep(640, 0.08, 'sawtooth', 0.06);
         } else if (itemKind === 'ring_atk') {
           hero.maxMp += 40 * sign; hero.mp += 40 * sign; if (!remove && typeof beep === 'function' && !state.muted) beep(540, 0.08, 'sawtooth', 0.05);
@@ -333,24 +340,16 @@ function drawWeather(dt) {
       }
       function tryCast(slot) {
         const h = players[0].hero; if (!h || h.dead) return;
-        if (slot === 1 && h.cd1 <= 0) {
-          if (h.heroClass === 'paladin') { if (h.mp < 40) return; h.mp -= 40; const R = 180; for (const u of players[0].units) { if (u.dead) continue; if (Math.hypot(u.x - h.x, u.y - h.y) <= R) { u.hp = Math.min(u.maxHp, u.hp + 90); } } beep(660, 0.08, 'triangle', 0.05); }
-          else if (h.heroClass === 'rogue') { if (h.mp < 25) return; h.mp -= 25; h.speedBuff = 2.5; beep(880, 0.06, 'square', 0.05); }
-          else { if (h.mp < 35) return; h.mp -= 35; const p = screenToWorld(input.x, input.y); const R = 120; for (const u of players[1].units.concat(players[2].units, neutral.units)) { if (u.dead) continue; if (Math.hypot(u.x - p.x, u.y - p.y) <= R) { u.damage(80, 0); } } beep(520, 0.08, 'sawtooth', 0.06); }
-          h.cd1 = h.cdM1; if (h.owner === 0) setHeroUI(h);
-        }
-        if (slot === 2 && h.cd2 <= 0) {
-          if (h.heroClass === 'paladin') { if (h.mp < 35) return; h.mp -= 35; h.shield = (h.shield || 0) + 120; beep(280, 0.08, 'triangle', 0.05); }
-          else if (h.heroClass === 'rogue') { if (h.mp < 40) return; h.mp -= 40; const R = 180; for (const e of players[1].units.concat(players[2].units, neutral.units)) { if (e.dead) continue; if (Math.hypot(e.x - h.x, e.y - h.y) <= R) { e.damage(70, 0); } } beep(720, 0.08, 'square', 0.06); }
-          else { if (h.mp < 60) return; h.mp -= 60; const e = new Unit(h.x + 24, h.y, h.owner, 'elemental', getUnitDeps()); e.dps = 18; e.maxHp = 200; e.hp = 200; e.attackRange = 210; e.summonTimer = 20; players[h.owner].units.push(e); beep(480, 0.09, 'sawtooth', 0.06); }
-          h.cd2 = h.cdM2; if (h.owner === 0) setHeroUI(h);
-        }
-        if (slot === 3 && h.cd3 <= 0) {
-          if (h.heroClass === 'paladin') { if (h.mp < 45) return; h.mp -= 45; const R = 200; for (const u of players[0].units) { if (Math.hypot(u.x - h.x, u.y - h.y) <= R) u.hp = Math.min(u.maxHp, u.hp + 70); } for (const e of players[1].units.concat(players[2].units, neutral.units)) { if (Math.hypot(e.x - h.x, e.y - h.y) <= R) e.damage(60, 0); } beep(560, 0.09, 'triangle', 0.06); }
-          else if (h.heroClass === 'rogue') { if (h.mp < 55) return; h.mp -= 55; const R = 220; for (const e of players[1].units.concat(players[2].units, neutral.units)) { if (Math.hypot(e.x - h.x, e.y - h.y) <= R) { e.damage(50, 0); e.slow = 3.5; } } beep(900, 0.07, 'square', 0.06); }
-          else { if (h.mp < 90) return; h.mp -= 90; const d = new Unit(h.x + 28, h.y + 12, h.owner, 'demon', getUnitDeps()); d.dps = 36; d.maxHp = 500; d.hp = 500; d.attackRange = 60; d.summonTimer = 25; players[h.owner].units.push(d); beep(360, 0.12, 'sawtooth', 0.07); }
-          h.cd3 = h.cdM3; if (h.owner === 0) setHeroUI(h);
-        }
+        const deps = {
+          players,
+          input,
+          screenToWorld,
+          beep,
+          enemies: () => players[1].units.concat(players[2].units, neutral.units),
+          createUnit: (x, y, owner, type) => new Unit(x, y, owner, type, getUnitDeps())
+        };
+        const casted = heroTryCast(h, slot, deps);
+        if (casted && h.owner === 0) setHeroUI(h);
       }
 
       /* ==== Input & selection ==== */
