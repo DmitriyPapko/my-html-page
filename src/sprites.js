@@ -365,6 +365,50 @@ function stableKey(obj) {
   return JSON.stringify(sorted);
 }
 
+function buildSpriteImage(key, spr, w, h, scale, override) {
+  let canvas = null;
+  if (typeof OffscreenCanvas !== 'undefined') {
+    canvas = new OffscreenCanvas(w * scale, h * scale);
+  } else if (typeof document !== 'undefined') {
+    canvas = document.createElement('canvas');
+    canvas.width = w * scale;
+    canvas.height = h * scale;
+  }
+  if (!canvas) return null;
+  const cctx = canvas.getContext('2d');
+  cctx.imageSmoothingEnabled = false;
+  for (let j = 0; j < h; j++) {
+    const row = spr[j];
+    for (let i = 0; i < w; i++) {
+      const ch = row[i];
+      if (ch === '.') continue;
+      const color = override[ch] || PALETTE[ch] || '#000';
+      cctx.fillStyle = color;
+      cctx.fillRect(i * scale, j * scale, scale, scale);
+    }
+  }
+  if (typeof canvas.transferToImageBitmap === 'function') {
+    const bmp = canvas.transferToImageBitmap();
+    CACHE.set(key, bmp);
+    if (CACHE.size > CACHE_LIMIT) {
+      const firstKey = CACHE.keys().next().value;
+      CACHE.delete(firstKey);
+    }
+    return bmp;
+  }
+  CACHE.set(key, canvas);
+  if (CACHE.size > CACHE_LIMIT) {
+    const firstKey = CACHE.keys().next().value;
+    CACHE.delete(firstKey);
+  }
+  if (typeof createImageBitmap === 'function') {
+    createImageBitmap(canvas).then(bmp => {
+      CACHE.set(key, bmp);
+    }).catch(() => {});
+  }
+  return canvas;
+}
+
 export function drawSprite(ctx, name, x, y, opts = {}) {
   let spr = SPRITES[name];
   if (!spr) return;
@@ -384,31 +428,12 @@ export function drawSprite(ctx, name, x, y, opts = {}) {
   }
   const w = spr[0].length;
   const h = spr.length;
-  let canvas = null;
+  let image = null;
   if (!flipX && !flipY && !rotate && alpha === 1 && !shadow) {
     const key = name + '@' + frame + '@' + scale + '@' + stableKey(override);
-    canvas = CACHE.get(key);
-    if (!canvas) {
-      canvas = document.createElement('canvas');
-      canvas.width = w * scale;
-      canvas.height = h * scale;
-      const cctx = canvas.getContext('2d');
-      cctx.imageSmoothingEnabled = false;
-      for (let j = 0; j < h; j++) {
-        const row = spr[j];
-        for (let i = 0; i < w; i++) {
-          const ch = row[i];
-          if (ch === '.') continue;
-          const color = override[ch] || PALETTE[ch] || '#000';
-          cctx.fillStyle = color;
-          cctx.fillRect(i * scale, j * scale, scale, scale);
-        }
-      }
-      CACHE.set(key, canvas);
-      if (CACHE.size > CACHE_LIMIT) {
-        const firstKey = CACHE.keys().next().value;
-        CACHE.delete(firstKey);
-      }
+    image = CACHE.get(key);
+    if (!image) {
+      image = buildSpriteImage(key, spr, w, h, scale, override);
     }
   }
   const tp = globalThis.toPixel || (v => v);
@@ -426,8 +451,8 @@ export function drawSprite(ctx, name, x, y, opts = {}) {
   ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
   const ox = anchor === 'center' ? -w * scale / 2 : 0;
   const oy = anchor === 'center' ? -h * scale / 2 : 0;
-  if (canvas) {
-    ctx.drawImage(canvas, ox, oy);
+  if (image) {
+    ctx.drawImage(image, ox, oy);
   } else {
     for (let j = 0; j < h; j++) {
       const row = spr[j];
