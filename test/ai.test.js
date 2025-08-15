@@ -242,4 +242,81 @@ const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
   assert.strictEqual(unit.target, weak);
 })();
 
+// rallyAttack ignores allied structures when selecting targets
+(() => {
+  const ally = { kind: 'square', hp: 10, isGhost: false };
+  const enemy = { kind: 'square', hp: 100, isGhost: false };
+  const unit = { type: 'soldier', setTarget(t) { this.target = t; } };
+  const players = [
+    { units: [], structures: [ally], hero: null, ai: false, teamId: 1 },
+    {
+      units: [unit],
+      structures: [{ kind: 'square', x: 0, y: 0 }],
+      hero: null,
+      ai: true,
+      aiPlan: null,
+      res: { rice: 0, water: 0 },
+      teamId: 1,
+    },
+    { units: [], structures: [enemy], hero: null, ai: false, teamId: 2 },
+  ];
+  const deps = { players, COSTS: {}, POP_CAP: 10, placeGhost: () => false, isBlocked: () => false, neutral: { camps: [] }, dist2, packPower, campPower };
+  const ai = new AIController(1, deps);
+  ai.init();
+  ai.player.aiPlan.pushAt = 1;
+  assert.strictEqual(ai.rallyAttack(), true);
+  assert.strictEqual(unit.target, enemy);
+})();
+
+// completeGhosts assigns builders and finalizes construction
+(() => {
+  const worker = { id: 2, type: 'worker', state: 'idle' };
+  const ghost = { id: 1, kind: 'barracks', isGhost: true, progress: 0 };
+  const players = [
+    { units: [], structures: [], hero: null, ai: false },
+    {
+      units: [worker],
+      structures: [ghost],
+      hero: null,
+      ai: true,
+      aiPlan: null,
+      res: { rice: 0, water: 0 },
+    },
+  ];
+  const deps = { players, COSTS: {}, POP_CAP: 10, placeGhost: () => false, isBlocked: () => false, neutral: { camps: [] }, dist2, packPower, campPower };
+  const ai = new AIController(1, deps);
+  ai.init();
+  assert.strictEqual(ai.completeGhosts(), true);
+  assert.strictEqual(worker.state, 'build');
+  assert.strictEqual(worker.buildTargetId, 1);
+  ghost.progress = 100;
+  ghost.buildWorkerId = worker.id;
+  assert.strictEqual(ai.completeGhosts(), true);
+  assert.strictEqual(ghost.isGhost, false);
+  assert.strictEqual(worker.state, 'idle');
+  assert.strictEqual(worker.buildTargetId, undefined);
+})();
+
+// manageIdleUnits assigns idle fighters to attack enemies
+(() => {
+  const enemy = { hp: 100 };
+  const unit = { type: 'soldier', state: 'idle', setTarget(t) { this.target = t; } };
+  const players = [
+    { units: [enemy], structures: [], hero: null, ai: false },
+    {
+      units: [unit],
+      structures: [{ kind: 'square', x: 0, y: 0 }],
+      hero: null,
+      ai: true,
+      aiPlan: null,
+      res: { rice: 0, water: 0 },
+    },
+  ];
+  const deps = { players, COSTS: {}, POP_CAP: 10, placeGhost: () => false, isBlocked: () => false, neutral: { camps: [] }, dist2, packPower, campPower };
+  const ai = new AIController(1, deps);
+  ai.init();
+  assert.strictEqual(ai.manageIdleUnits(), true);
+  assert.strictEqual(unit.target, enemy);
+})();
+
 console.log('All tests passed.');
