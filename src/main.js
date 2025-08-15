@@ -1,4 +1,4 @@
-import { drawSprite } from "./sprites.js";
+import { drawSprite, initSprites } from "./sprites.js";
 import { Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, getById, enemiesFor, allUnits, allStructures, nearestNode, lootFromTier } from "./entities.js";
 import state from './state.js';
 import { AIController } from './ai.js';
@@ -14,6 +14,7 @@ const dist2 = (x1, y1, x2, y2) => { const dx = x2 - x1, dy = y2 - y1; return dx 
 const cvs = document.getElementById('game'), ctx = cvs.getContext('2d'); ctx.imageSmoothingEnabled = false;
 const mini = document.getElementById('minimap'), mctx = mini.getContext('2d'); mctx.imageSmoothingEnabled = false;
 globalThis.drawSprite = (name, x, y, scale = 1, override = {}) => drawSprite(ctx, name, x, y, { scale, override });
+initSprites();
 const DPR = Math.max(1, window.devicePixelRatio || 1);
 mini.width = Math.floor(mini.clientWidth * DPR);
 mini.height = Math.floor(mini.clientHeight * DPR);
@@ -615,7 +616,7 @@ globalThis.resetGame = resetGame;
       function drawHp(x, y, k) { k = clamp(k, 0, 1); ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(x - 18, y - 4, 36, 6); ctx.fillStyle = k > .5 ? '#6be36b' : (k > .25 ? '#ffd36b' : '#ff6b6b'); ctx.fillRect(x - 18, y - 4, 36 * k, 6); ctx.strokeStyle = 'rgba(255,255,255,.15)'; ctx.strokeRect(x - 18, y - 4, 36, 6); }
 globalThis.drawHp = drawHp;
       function loop(t) {
-        const dt = Math.min(0.033, (t - last) / 1000); last = t; simTime += dt;
+        const dt = Math.min(0.033, (t - last) / 1000); last = t; simTime += dt; globalThis.simTime = simTime;
         clearVisible(); for (const s of players[0].structures) revealCircle(s.x, s.y, 520); for (const u of players[0].units) revealCircle(u.x, u.y, 480);
         if (!state.paused) {
           const sp = 900 / world.zoom; if (input.keys['w'] || input.keys['ц']) world.camY -= sp * dt; if (input.keys['s'] || input.keys['ы']) world.camY += sp * dt; if (input.keys['a'] || input.keys['ф']) world.camX -= sp * dt; if (input.keys['d'] || input.keys['в']) world.camX += sp * dt; clampCam();

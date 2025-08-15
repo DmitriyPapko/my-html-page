@@ -354,6 +354,43 @@ export const SPRITES = {
   ]
 };
 
+// Sprite atlas support
+let FRAMES = {}, ANIMS = {};
+
+async function loadAtlas(jsonUrl) {
+  try {
+    const meta = await fetch(jsonUrl).then(r => r.json());
+    const img = new Image(); img.decoding = 'async';
+    img.src = meta.imageData || meta.image || jsonUrl.replace('.json', '.png');
+    await img.decode();
+    return { img, meta };
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function initSprites() {
+  const base = await loadAtlas('docs/sprites.json');
+  if (base) {
+    FRAMES = { ...FRAMES, ...base.meta.frames };
+    ANIMS = { ...ANIMS, ...(base.meta.animations || {}) };
+    globalThis.__SPRITE_IMG__ = base.img;
+  }
+  const worker = await loadAtlas('docs/worker_sprites.json');
+  if (worker) {
+    FRAMES = { ...FRAMES, ...worker.meta.frames };
+    ANIMS = { ...ANIMS, ...worker.meta.animations };
+    globalThis.__SPRITE_IMG_WORKER__ = worker.img;
+  }
+}
+
+export function nextFrame(anim, t) {
+  const seq = ANIMS[anim];
+  if (!seq) return null;
+  const idx = Math.floor((t * 10) % seq.length);
+  return seq[idx];
+}
+
 const CACHE = new Map();
 const CACHE_LIMIT = 200;
 
@@ -410,6 +447,34 @@ function buildSpriteImage(key, spr, w, h, scale, override) {
 }
 
 export function drawSprite(ctx, name, x, y, opts = {}) {
+  if (FRAMES[name]) {
+    const f = FRAMES[name];
+    const {
+      scale = 1,
+      alpha = 1,
+      flipX = false,
+      flipY = false,
+      rotate = 0,
+    } = opts;
+    const img = name.startsWith('worker_') ? globalThis.__SPRITE_IMG_WORKER__ : globalThis.__SPRITE_IMG__;
+    if (!img) return;
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha *= alpha;
+    ctx.translate(x, y);
+    if (rotate) ctx.rotate(rotate);
+    ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+    const ax = f.anchor?.x ?? 0;
+    const ay = f.anchor?.y ?? 0;
+    ctx.drawImage(
+      img,
+      f.frame.x, f.frame.y, f.frame.w, f.frame.h,
+      Math.floor(-ax * scale), Math.floor(-ay * scale),
+      f.frame.w * scale, f.frame.h * scale
+    );
+    ctx.restore();
+    return;
+  }
   let spr = SPRITES[name];
   if (!spr) return;
   const {

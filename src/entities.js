@@ -261,56 +261,66 @@ export class Unit extends Entity {
     const ctx = globalThis.ctx;
     const col = globalThis.players[this.owner]?.color || '#9fb2a1';
     globalThis.drawShadow(s.x, s.y + 12 * zoom, 12 * zoom);
-    ctx.save();
-    ctx.translate(s.x, s.y);
-    ctx.scale(zoom, zoom);
-    const grad = ctx.createLinearGradient(0, -12, 0, 12);
-    grad.addColorStop(0, '#f0f0f0');
-    grad.addColorStop(1, '#bdbdbd');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(0, -8, 8, Math.PI, 0);
-    ctx.lineTo(8, 8);
-    ctx.arc(0, 8, 8, 0, Math.PI);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = col;
-    ctx.fillRect(-8, -2, 16, 4);
-    // unique icons for unit types
-    if (this.type === 'worker') {
-      // small hammer on the side
-      ctx.strokeStyle = '#ccc';
-      ctx.lineWidth = 2;
+    if (this.type === 'worker' && !this.isHero && globalThis.nextFrame) {
+      const movingStates = ['move', 'to_node', 'to_hq', 'build'];
+      let animName = 'worker_idle';
+      if (this.state === 'harvest') animName = 'worker_gather';
+      else if (movingStates.includes(this.state)) animName = 'worker_walk';
+      else if (this.state === 'fight') animName = 'worker_attack';
+      const frame = globalThis.nextFrame(animName, globalThis.simTime || 0) || 'worker_idle_0';
+      globalThis.drawSprite(frame, s.x, s.y, zoom);
+    } else {
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.scale(zoom, zoom);
+      const grad = ctx.createLinearGradient(0, -12, 0, 12);
+      grad.addColorStop(0, '#f0f0f0');
+      grad.addColorStop(1, '#bdbdbd');
+      ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.moveTo(10, -6);
-      ctx.lineTo(14, -10);
-      ctx.moveTo(10, -6);
-      ctx.lineTo(14, -2);
-      ctx.stroke();
-    } else if (this.type === 'soldier') {
-      // blade for swordsman
-      ctx.fillStyle = '#ccc';
-      ctx.beginPath();
-      ctx.moveTo(-12, -4);
-      ctx.lineTo(-8, 0);
-      ctx.lineTo(-12, 4);
+      ctx.arc(0, -8, 8, Math.PI, 0);
+      ctx.lineTo(8, 8);
+      ctx.arc(0, 8, 8, 0, Math.PI);
       ctx.closePath();
       ctx.fill();
-    } else if (this.type === 'archer') {
-      // bow arc
-      ctx.strokeStyle = '#da8';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(12, 0, 6, -Math.PI / 2, Math.PI / 2);
-      ctx.stroke();
-    } else if (this.type === 'mage') {
-      // magic orb/staff
-      ctx.fillStyle = '#8ad';
-      ctx.beginPath();
-      ctx.arc(0, -14, 4, 0, 6.283);
-      ctx.fill();
+      ctx.fillStyle = col;
+      ctx.fillRect(-8, -2, 16, 4);
+      // unique icons for unit types
+      if (this.type === 'worker') {
+        // small hammer on the side
+        ctx.strokeStyle = '#ccc';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(10, -6);
+        ctx.lineTo(14, -10);
+        ctx.moveTo(10, -6);
+        ctx.lineTo(14, -2);
+        ctx.stroke();
+      } else if (this.type === 'soldier') {
+        // blade for swordsman
+        ctx.fillStyle = '#ccc';
+        ctx.beginPath();
+        ctx.moveTo(-12, -4);
+        ctx.lineTo(-8, 0);
+        ctx.lineTo(-12, 4);
+        ctx.closePath();
+        ctx.fill();
+      } else if (this.type === 'archer') {
+        // bow arc
+        ctx.strokeStyle = '#da8';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(12, 0, 6, -Math.PI / 2, Math.PI / 2);
+        ctx.stroke();
+      } else if (this.type === 'mage') {
+        // magic orb/staff
+        ctx.fillStyle = '#8ad';
+        ctx.beginPath();
+        ctx.arc(0, -14, 4, 0, 6.283);
+        ctx.fill();
+      }
+      ctx.restore();
     }
-    ctx.restore();
     globalThis.drawHp(s.x, s.y - 18 * zoom, this.hp / this.maxHp);
     for (const eff of this.effects) {
       if (eff.draw) eff.draw(ctx, this);
