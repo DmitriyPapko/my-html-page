@@ -1,5 +1,10 @@
 /* ==== Menu & toggles ==== */
 import state from './state.js';
+import { initResourceBar, drawResourceBar } from './ui/components/ResourceBar.js';
+import { initHeroPanel, drawHeroPanel } from './ui/components/HeroPanel.js';
+import { initCommandCard, drawCommandCard } from './ui/components/CommandCard.js';
+import { initUnitCard, drawUnitCard } from './ui/components/UnitCard.js';
+import { initTooltip } from './ui/components/Tooltip.js';
 
 const menu = document.getElementById('menu');
 const btnStart = document.getElementById('btnStart');
@@ -51,3 +56,23 @@ globalThis.showResultMenu = (msg) => {
   document.getElementById('heroSelect').style.display = 'none';
   resultMenu.style.display = 'flex';
 };
+
+/* ==== Warcraft style HUD ==== */
+export function initUI(deps) {
+  initResourceBar(deps);
+  initHeroPanel(deps);
+  initCommandCard(deps);
+  initUnitCard(deps);
+  initTooltip();
+}
+
+export function drawUI(dt) {
+  drawResourceBar(dt);
+  drawHeroPanel(dt);
+  drawCommandCard(dt);
+  drawUnitCard(dt);
+}
+
+// expose for convenience
+globalThis.initUI = initUI;
+globalThis.drawUI = drawUI;
