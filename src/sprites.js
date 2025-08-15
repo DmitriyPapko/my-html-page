@@ -435,6 +435,70 @@ export async function initRogueAtlas() {
   globalThis.__SPRITE_IMG_ROGUE__ = a.img;
 }
 
+export async function initSoldierAtlas() {
+  const a = await __loadAtlas('soldier_sprites.json').catch(() => null);
+  if (!a) return;
+  Object.assign(FRAMES, a.meta.frames || {});
+  Object.assign(ANIMS, a.meta.animations || {});
+  globalThis.__SPRITE_IMG_SOLDIER__ = a.img;
+}
+
+export async function initArcherAtlas() {
+  const a = await __loadAtlas('archer_sprites.json').catch(() => null);
+  if (!a) return;
+  Object.assign(FRAMES, a.meta.frames || {});
+  Object.assign(ANIMS, a.meta.animations || {});
+  globalThis.__SPRITE_IMG_ARCHER__ = a.img;
+}
+
+export async function initDemonAtlas() {
+  const a = await __loadAtlas('demon_sprites.json').catch(() => null);
+  if (!a) return;
+  Object.assign(FRAMES, a.meta.frames || {});
+  Object.assign(ANIMS, a.meta.animations || {});
+  globalThis.__SPRITE_IMG_DEMON__ = a.img;
+}
+
+export async function initElementalAtlas() {
+  const a = await __loadAtlas('elemental_sprites.json').catch(() => null);
+  if (!a) return;
+  Object.assign(FRAMES, a.meta.frames || {});
+  Object.assign(ANIMS, a.meta.animations || {});
+  globalThis.__SPRITE_IMG_ELEMENTAL__ = a.img;
+}
+
+export async function initForestTrollAtlas() {
+  const a = await __loadAtlas('forest_troll_sprites.json').catch(() => null);
+  if (!a) return;
+  Object.assign(FRAMES, a.meta.frames || {});
+  Object.assign(ANIMS, a.meta.animations || {});
+  globalThis.__SPRITE_IMG_FOREST_TROLL__ = a.img;
+}
+
+export async function initGnomeSeekerAtlas() {
+  const a = await __loadAtlas('gnome_seeker_sprites.json').catch(() => null);
+  if (!a) return;
+  Object.assign(FRAMES, a.meta.frames || {});
+  Object.assign(ANIMS, a.meta.animations || {});
+  globalThis.__SPRITE_IMG_GNOME_SEEKER__ = a.img;
+}
+
+export async function initHermitMageAtlas() {
+  const a = await __loadAtlas('hermit_mage_sprites.json').catch(() => null);
+  if (!a) return;
+  Object.assign(FRAMES, a.meta.frames || {});
+  Object.assign(ANIMS, a.meta.animations || {});
+  globalThis.__SPRITE_IMG_HERMIT_MAGE__ = a.img;
+}
+
+export async function initWildBeastAtlas() {
+  const a = await __loadAtlas('wild_beast_sprites.json').catch(() => null);
+  if (!a) return;
+  Object.assign(FRAMES, a.meta.frames || {});
+  Object.assign(ANIMS, a.meta.animations || {});
+  globalThis.__SPRITE_IMG_WILD_BEAST__ = a.img;
+}
+
 export function nextFrame(anim, t, fps = 10) {
   const seq = ANIMS[anim];
   if (!seq) return null;
@@ -452,6 +516,14 @@ export function pickSpriteImage(name) {
   if (name.startsWith('rogue_')) return globalThis.__SPRITE_IMG_ROGUE__;
   if (name.startsWith('mage_')) return globalThis.__SPRITE_IMG_MAGE__;
   if (name.startsWith('worker_')) return globalThis.__SPRITE_IMG_WORKER__;
+  if (name.startsWith('soldier_')) return globalThis.__SPRITE_IMG_SOLDIER__;
+  if (name.startsWith('archer_')) return globalThis.__SPRITE_IMG_ARCHER__;
+  if (name.startsWith('demon_')) return globalThis.__SPRITE_IMG_DEMON__;
+  if (name.startsWith('elemental_')) return globalThis.__SPRITE_IMG_ELEMENTAL__;
+  if (name.startsWith('forest_troll_')) return globalThis.__SPRITE_IMG_FOREST_TROLL__;
+  if (name.startsWith('gnome_seeker_')) return globalThis.__SPRITE_IMG_GNOME_SEEKER__;
+  if (name.startsWith('hermit_mage_')) return globalThis.__SPRITE_IMG_HERMIT_MAGE__;
+  if (name.startsWith('wild_beast_')) return globalThis.__SPRITE_IMG_WILD_BEAST__;
   if (
     name.startsWith('grass_') ||
     name.startsWith('water_') ||
