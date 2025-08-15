@@ -319,4 +319,79 @@ const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
   assert.strictEqual(unit.target, enemy);
 })();
 
+// maintainWorkers distributes workers according to priorities
+(() => {
+  const workers = Array.from({ length: 5 }, () => ({ type: 'worker', state: 'idle' }));
+  const players = [
+    { units: [], structures: [], hero: null, ai: false },
+    {
+      units: workers,
+      structures: [{ kind: 'square', queue: [] }],
+      hero: null,
+      ai: true,
+      aiPlan: null,
+      res: { rice: 0, water: 0 },
+    },
+  ];
+  const deps = { players, COSTS: {}, POP_CAP: 10, placeGhost: () => false, isBlocked: () => false, neutral: { camps: [] }, dist2, packPower, campPower };
+  const ai = new AIController(1, deps);
+  ai.setDifficulty('easy');
+  ai.init();
+  ai.maintainWorkers();
+  const rice = workers.filter(w => w.role === 'rice').length;
+  const water = workers.filter(w => w.role === 'water').length;
+  assert.ok(rice > water);
+})();
+
+// adaptiveRecon uses configured scout frequency
+(() => {
+  const scout = { type: 'soldier', setDest(x, y) { this.dest = [x, y]; } };
+  const players = [
+    { units: [], structures: [], hero: null, ai: false },
+    {
+      units: [scout],
+      structures: [{ kind: 'square', x: 0, y: 0 }],
+      hero: null,
+      ai: true,
+      aiPlan: null,
+      res: { rice: 0, water: 0 },
+    },
+  ];
+  const deps = { players, COSTS: {}, POP_CAP: 10, placeGhost: () => false, isBlocked: () => false, neutral: { camps: [] }, dist2, packPower, campPower };
+  const ai = new AIController(1, deps);
+  ai.init();
+  ai.player.aiPlan.scoutFrequency = 50;
+  ai.player.aiPlan.scoutTimer = 0;
+  assert.strictEqual(ai.adaptiveRecon({ dt: 0 }), true);
+  assert.strictEqual(ai.player.aiPlan.scoutTimer, 50);
+})();
+
+// evaluateAggression adjusts aggression based on enemy strength and map control
+(() => {
+  const enemyUnit = { hp: 50, dps: 5, dead: false };
+  const players = [
+    { units: [enemyUnit], structures: [{ kind: 'square' }], hero: null, ai: false },
+    {
+      units: [
+        { type: 'soldier', hp: 100, dps: 10, dead: false },
+        { type: 'archer', hp: 80, dps: 10, dead: false },
+      ],
+      structures: [{ kind: 'square' }],
+      hero: null,
+      ai: true,
+      aiPlan: null,
+      res: { rice: 0, water: 0 },
+    },
+  ];
+  const deps = { players, COSTS: {}, POP_CAP: 10, placeGhost: () => false, isBlocked: () => false, neutral: { camps: [] }, dist2, packPower, campPower };
+  const ai = new AIController(1, deps);
+  ai.init();
+  ai.evaluateAggression();
+  const base = ai.player.aiPlan.baseAggression;
+  assert.ok(ai.player.aiPlan.aggression > base);
+  players[0].units.push({ hp: 300, dps: 30, dead: false });
+  ai.evaluateAggression();
+  assert.ok(ai.player.aiPlan.aggression < base);
+})();
+
 console.log('All tests passed.');
