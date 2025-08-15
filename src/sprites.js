@@ -403,12 +403,25 @@ export async function initWorkerAtlas() {
   }
 }
 
-export async function initMageAtlas() {
+export async function initMageUnitAtlas() {
   const a = await __loadAtlas('mage_sprites.json').catch(() => null);
   if (!a) return;
   Object.assign(FRAMES, a.meta.frames || {});
   Object.assign(ANIMS, a.meta.animations || {});
-  globalThis.__SPRITE_IMG_MAGE__ = a.img;
+  globalThis.__SPRITE_IMG_MAGEUNIT__ = a.img;
+}
+
+export async function initArchmageAtlas() {
+  // Try dedicated archmage atlas; fall back to mage atlas if missing
+  let a = await __loadAtlas('archmage_sprites.json').catch(() => null);
+  if (!a) {
+    a = await __loadAtlas('mage_sprites.json').catch(() => null);
+    if (!a) return;
+  }
+  Object.assign(FRAMES, a.meta.frames || {});
+  Object.assign(ANIMS, a.meta.animations || {});
+  globalThis.__SPRITE_IMG_ARCHMAGE__ = a.img;
+  aliasAnimPrefix('mage_', 'archmage_');
 }
 
 export async function initTerrainAtlas() {
@@ -472,7 +485,7 @@ export async function initForestTrollAtlas() {
   if (!a) return;
   Object.assign(FRAMES, a.meta.frames || {});
   Object.assign(ANIMS, a.meta.animations || {});
-  globalThis.__SPRITE_IMG_FOREST_TROLL__ = a.img;
+  globalThis.__SPRITE_IMG_TROLL__ = a.img;
 }
 
 export async function initGnomeSeekerAtlas() {
@@ -480,7 +493,7 @@ export async function initGnomeSeekerAtlas() {
   if (!a) return;
   Object.assign(FRAMES, a.meta.frames || {});
   Object.assign(ANIMS, a.meta.animations || {});
-  globalThis.__SPRITE_IMG_GNOME_SEEKER__ = a.img;
+  globalThis.__SPRITE_IMG_GNOME__ = a.img;
 }
 
 export async function initHermitMageAtlas() {
@@ -488,7 +501,7 @@ export async function initHermitMageAtlas() {
   if (!a) return;
   Object.assign(FRAMES, a.meta.frames || {});
   Object.assign(ANIMS, a.meta.animations || {});
-  globalThis.__SPRITE_IMG_HERMIT_MAGE__ = a.img;
+  globalThis.__SPRITE_IMG_HERMIT__ = a.img;
 }
 
 export async function initWildBeastAtlas() {
@@ -496,49 +509,46 @@ export async function initWildBeastAtlas() {
   if (!a) return;
   Object.assign(FRAMES, a.meta.frames || {});
   Object.assign(ANIMS, a.meta.animations || {});
-  globalThis.__SPRITE_IMG_WILD_BEAST__ = a.img;
+  globalThis.__SPRITE_IMG_BEAST__ = a.img;
 }
 
 export function nextFrame(anim, t, fps = 10) {
-  const seq = ANIMS[anim];
-  if (!seq) return null;
-  const idx = Math.floor((t * fps) % seq.length);
-  return seq[idx];
+  const arr = ANIMS?.[anim];
+  if (!arr || !arr.length) return null;
+  const idx = Math.floor(t * fps) % arr.length;
+  return arr[idx];
 }
+globalThis.nextFrame = nextFrame;
 
 // выбрать правильный атлас по имени кадра
-export function pickSpriteImage(name) {
-  // Guard against undefined sprite names which can occur when an animation
-  // frame lookup fails. In that case fall back to the default sprite atlas so
-  // that callers can safely skip rendering without throwing.
+function routeImageByName(name) {
   if (typeof name !== 'string') return globalThis.__SPRITE_IMG__;
-  if (name.startsWith('paladin_')) return globalThis.__SPRITE_IMG_PALADIN__;
-  if (name.startsWith('rogue_')) return globalThis.__SPRITE_IMG_ROGUE__;
-  if (name.startsWith('soldier_')) return globalThis.__SPRITE_IMG_SOLDIER__;
-  if (name.startsWith('archer_')) return globalThis.__SPRITE_IMG_ARCHER__;
-  if (name.startsWith('demon_')) return globalThis.__SPRITE_IMG_DEMON__;
-  if (name.startsWith('elemental_')) return globalThis.__SPRITE_IMG_ELEMENTAL__;
-  if (name.startsWith('forest_troll_')) return globalThis.__SPRITE_IMG_FOREST_TROLL__;
-  if (name.startsWith('gnome_seeker_')) return globalThis.__SPRITE_IMG_GNOME_SEEKER__;
-  if (name.startsWith('hermit_mage_')) return globalThis.__SPRITE_IMG_HERMIT_MAGE__;
-  if (name.startsWith('wild_beast_')) return globalThis.__SPRITE_IMG_WILD_BEAST__;
-  if (name.startsWith('mage_')) return globalThis.__SPRITE_IMG_MAGE__;
-  if (name.startsWith('worker_')) return globalThis.__SPRITE_IMG_WORKER__;
-  if (name.startsWith('soldier_')) return globalThis.__SPRITE_IMG_SOLDIER__;
-  if (name.startsWith('archer_')) return globalThis.__SPRITE_IMG_ARCHER__;
-  if (name.startsWith('demon_')) return globalThis.__SPRITE_IMG_DEMON__;
-  if (name.startsWith('elemental_')) return globalThis.__SPRITE_IMG_ELEMENTAL__;
-  if (name.startsWith('forest_troll_')) return globalThis.__SPRITE_IMG_FOREST_TROLL__;
-  if (name.startsWith('gnome_seeker_')) return globalThis.__SPRITE_IMG_GNOME_SEEKER__;
-  if (name.startsWith('hermit_mage_')) return globalThis.__SPRITE_IMG_HERMIT_MAGE__;
-  if (name.startsWith('wild_beast_')) return globalThis.__SPRITE_IMG_WILD_BEAST__;
-  if (
-    name.startsWith('grass_') ||
-    name.startsWith('water_') ||
-    name === 'dirt' ||
-    name.startsWith('tree_')
-  )
+  // Heroes
+  if (name.startsWith('paladin_'))  return globalThis.__SPRITE_IMG_PALADIN__;
+  if (name.startsWith('rogue_'))    return globalThis.__SPRITE_IMG_ROGUE__;
+  if (name.startsWith('archmage_')) return globalThis.__SPRITE_IMG_ARCHMAGE__;
+
+  // Units
+  if (name.startsWith('soldier_'))      return globalThis.__SPRITE_IMG_SOLDIER__;
+  if (name.startsWith('archer_'))       return globalThis.__SPRITE_IMG_ARCHER__;
+  if (name.startsWith('mage_'))         return globalThis.__SPRITE_IMG_MAGEUNIT__;
+  if (name.startsWith('elemental_'))    return globalThis.__SPRITE_IMG_ELEMENTAL__;
+  if (name.startsWith('demon_'))        return globalThis.__SPRITE_IMG_DEMON__;
+  if (name.startsWith('hermit_mage_'))  return globalThis.__SPRITE_IMG_HERMIT__;
+  if (name.startsWith('gnome_seeker_')) return globalThis.__SPRITE_IMG_GNOME__;
+  if (name.startsWith('forest_troll_')) return globalThis.__SPRITE_IMG_TROLL__;
+  if (name.startsWith('wild_beast_'))   return globalThis.__SPRITE_IMG_BEAST__;
+  if (name.startsWith('worker_'))       return globalThis.__SPRITE_IMG_WORKER__;
+
+  // Terrain / buildings
+  if (name.startsWith('grass_') || name.startsWith('water_') || name === 'dirt' || name.startsWith('tree_'))
     return globalThis.__SPRITE_IMG_TERRAIN__;
+  if (
+    name.startsWith('hq_') || name.startsWith('well_') || name.startsWith('altar_') ||
+    name.startsWith('barracks_') || name.startsWith('range_') || name.startsWith('mBarracks_') ||
+    name.startsWith('square_') || /^(hq|well|altar|barracks|range|mBarracks|square)[AB]_/.test(name)
+  ) return globalThis.__SPRITE_IMG_BUILDINGS__;
+
   return globalThis.__SPRITE_IMG__;
 }
 
@@ -564,7 +574,7 @@ export function drawTile(
   const F = globalThis.FRAMES?.[name];
   if (!F) return;
 
-  const IMG = pickSpriteImage(name);
+  const IMG = routeImageByName(name);
   if (!IMG) return;
 
   // мировые координаты верхнего-левого угла клетки:
@@ -649,21 +659,8 @@ function buildSpriteImage(key, spr, w, h, scale, override) {
 export function drawSprite(ctx, name, x, y, opts = {}) {
   if (FRAMES[name]) {
     const f = FRAMES[name];
-    const {
-      scale = 1,
-      alpha = 1,
-      flipX = false,
-      flipY = false,
-      rotate = 0,
-    } = opts;
-    const img =
-      name.startsWith('paladin_') ? globalThis.__SPRITE_IMG_PALADIN__ :
-      name.startsWith('rogue_')   ? globalThis.__SPRITE_IMG_ROGUE__   :
-      name.startsWith('mage_')    ? globalThis.__SPRITE_IMG_MAGE__    :
-      name.startsWith('worker_')  ? globalThis.__SPRITE_IMG_WORKER__  :
-      (name.startsWith('grass_') || name.startsWith('water_') || name === 'dirt' || name.startsWith('tree_'))
-        ? globalThis.__SPRITE_IMG_TERRAIN__
-        : globalThis.__SPRITE_IMG__;
+    const { scale = 1, alpha = 1, flipX = false, flipY = false, rotate = 0 } = opts;
+    const img = routeImageByName(name);
     if (!img) return;
     ctx.save();
     ctx.imageSmoothingEnabled = false;
@@ -743,4 +740,13 @@ export function drawSprite(ctx, name, x, y, opts = {}) {
 export function drawSpriteLegacy(name, x, y, scale = 1, override = {}) {
   if (!globalThis.ctx) return;
   drawSprite(globalThis.ctx, name, x, y, { scale, override });
+}
+
+function aliasAnimPrefix(from, to) {
+  for (const [k, arr] of Object.entries(ANIMS)) {
+    if (k.startsWith(from)) ANIMS[k.replace(from, to)] = arr.map(n => n.replace(from, to));
+  }
+  for (const k of Object.keys(FRAMES)) {
+    if (k.startsWith(from)) FRAMES[k.replace(from, to)] = FRAMES[k];
+  }
 }
