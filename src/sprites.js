@@ -373,17 +373,14 @@ async function loadAtlas(jsonUrl) {
 
 export async function initSprites() {
   const prefix = (typeof location !== 'undefined' && location.pathname.includes('/docs/')) ? '' : 'docs/';
-  const base = await loadAtlas(prefix + 'sprites.json');
-  if (base) {
-    FRAMES = { ...FRAMES, ...base.meta.frames };
-    ANIMS = { ...ANIMS, ...(base.meta.animations || {}) };
-    globalThis.__SPRITE_IMG__ = base.img;
-  }
   const worker = await loadAtlas(prefix + 'worker_sprites.json');
   if (worker) {
     FRAMES = { ...FRAMES, ...worker.meta.frames };
     ANIMS = { ...ANIMS, ...worker.meta.animations };
     globalThis.__SPRITE_IMG_WORKER__ = worker.img;
+    if (!globalThis.__SPRITE_IMG__) {
+      globalThis.__SPRITE_IMG__ = worker.img;
+    }
   }
 }
 
