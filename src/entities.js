@@ -261,13 +261,31 @@ export class Unit extends Entity {
     const ctx = globalThis.ctx;
     const col = globalThis.players[this.owner]?.color || '#9fb2a1';
     globalThis.drawShadow(s.x, s.y + 12 * zoom, 12 * zoom);
-    if (this.isHero && globalThis.nextFrame && globalThis.drawSprite) {
+    if (this.isHero && globalThis.nextFrame && globalThis.drawSprite && globalThis.FRAMES) {
+      if (this.heroClass === 'paladin') {
+        let anim = 'paladin_idle';
+        if (this.dead) anim = 'paladin_death';
+        else if (this.state === 'cast') anim = 'paladin_cast';
+        else if (this.state === 'fight') anim = 'paladin_attack';
+        else if (this.state === 'move') anim = 'paladin_walk';
+        const frame = globalThis.nextFrame(
+          anim,
+          globalThis.simTime || 0,
+          anim === 'paladin_cast' ? 12 : 10
+        ) || 'paladin_idle_0';
+        globalThis.drawSprite(frame, s.x, s.y, zoom);
+        return;
+      }
       let anim = 'mage_idle';
       if (this.dead) anim = 'mage_death';
       else if (this.state === 'cast') anim = 'mage_cast';
       else if (this.state === 'fight') anim = 'mage_attack';
       else if (this.state === 'move') anim = 'mage_walk';
-      const frame = globalThis.nextFrame(anim, globalThis.simTime || 0, anim === 'mage_cast' ? 12 : 10) || 'mage_idle_0';
+      const frame = globalThis.nextFrame(
+        anim,
+        globalThis.simTime || 0,
+        anim === 'mage_cast' ? 12 : 10
+      ) || 'mage_idle_0';
       globalThis.drawSprite(frame, s.x, s.y, zoom);
       return;
     }
