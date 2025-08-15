@@ -15,10 +15,13 @@ export class Sequence {
     this.children = children;
   }
   tick(ctx) {
+    let all = true;
     for (const child of this.children) {
-      if (child.tick(ctx) === false) return false;
+      if (child.tick(ctx) === false) {
+        all = false;
+      }
     }
-    return true;
+    return all;
   }
 }
 
