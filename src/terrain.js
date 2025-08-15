@@ -111,7 +111,14 @@ export function drawTerrain() {
       const kind = ((hash(i, j) & 255) < 10) ? 'water' : 'grass';
       let name = null;
       if (kind === 'water') {
-        name = globalThis.nextFrame ? globalThis.nextFrame('water_loop', globalThis.simTime || 0, 8) : 'water_0';
+        // When the water animation atlas hasn't loaded yet, nextFrame may
+        // return null which previously resulted in an undefined sprite name
+        // being passed to drawTile. Fallback to the first frame to avoid
+        // runtime errors and ensure water tiles still render.
+        const frame = globalThis.nextFrame
+          ? globalThis.nextFrame('water_loop', globalThis.simTime || 0, 8)
+          : null;
+        name = frame || 'water_0';
       } else if (kind === 'grass') {
         const h = ((i * 73856093) ^ (j * 19349663)) & 3;
         name = h === 0 ? 'grass_flowers' : (h & 1 ? 'grass_A' : 'grass_B');
