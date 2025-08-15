@@ -427,6 +427,14 @@ export async function initPaladinAtlas() {
   globalThis.__SPRITE_IMG_PALADIN__ = a.img;
 }
 
+export async function initRogueAtlas() {
+  const a = await __loadAtlas('rogue_sprites.json').catch(() => null);
+  if (!a) return;
+  Object.assign(FRAMES, a.meta.frames || {});
+  Object.assign(ANIMS, a.meta.animations || {});
+  globalThis.__SPRITE_IMG_ROGUE__ = a.img;
+}
+
 export function nextFrame(anim, t, fps = 10) {
   const seq = ANIMS[anim];
   if (!seq) return null;
@@ -441,6 +449,7 @@ export function pickSpriteImage(name) {
   // that callers can safely skip rendering without throwing.
   if (typeof name !== 'string') return globalThis.__SPRITE_IMG__;
   if (name.startsWith('paladin_')) return globalThis.__SPRITE_IMG_PALADIN__;
+  if (name.startsWith('rogue_')) return globalThis.__SPRITE_IMG_ROGUE__;
   if (name.startsWith('mage_')) return globalThis.__SPRITE_IMG_MAGE__;
   if (name.startsWith('worker_')) return globalThis.__SPRITE_IMG_WORKER__;
   if (
@@ -569,6 +578,7 @@ export function drawSprite(ctx, name, x, y, opts = {}) {
     } = opts;
     const img =
       name.startsWith('paladin_') ? globalThis.__SPRITE_IMG_PALADIN__ :
+      name.startsWith('rogue_')   ? globalThis.__SPRITE_IMG_ROGUE__   :
       name.startsWith('mage_')    ? globalThis.__SPRITE_IMG_MAGE__    :
       name.startsWith('worker_')  ? globalThis.__SPRITE_IMG_WORKER__  :
       (name.startsWith('grass_') || name.startsWith('water_') || name === 'dirt' || name.startsWith('tree_'))

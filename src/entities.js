@@ -275,6 +275,19 @@ export class Unit extends Entity {
         ) || 'paladin_idle_0';
         globalThis.drawSprite(frame, s.x, s.y, zoom);
         return;
+      } else if (this.heroClass === 'rogue') {
+        let anim = 'rogue_idle';
+        if (this.dead) anim = 'rogue_death';
+        else if (this.state === 'cast') anim = 'rogue_cast';
+        else if (this.state === 'fight') anim = 'rogue_attack';
+        else if (this.state === 'move') anim = 'rogue_walk';
+        const frame = globalThis.nextFrame(
+          anim,
+          globalThis.simTime || 0,
+          anim === 'rogue_cast' ? 12 : 10
+        ) || 'rogue_idle_0';
+        globalThis.drawSprite(frame, s.x, s.y, zoom);
+        return;
       }
       let anim = 'mage_idle';
       if (this.dead) anim = 'mage_death';
