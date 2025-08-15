@@ -9,7 +9,11 @@ const grassTile = document.createElement('canvas');
 grassTile.width = TILE; grassTile.height = TILE;
 const gctx = grassTile.getContext('2d');
 gctx.imageSmoothingEnabled = false;
-drawSprite(gctx, 'grass', TILE / 2, TILE / 2, { scale: 4 });
+if (globalThis.FRAMES?.grass_A) {
+  drawSprite(gctx, 'grass_A', TILE / 2, TILE / 2, { scale: 2 });
+} else {
+  drawSprite(gctx, 'grass', TILE / 2, TILE / 2, { scale: 4 });
+}
 
 const waterTile = document.createElement('canvas');
 waterTile.width = TILE; waterTile.height = TILE;
@@ -22,18 +26,34 @@ wctx.fillStyle = grad;
 wctx.fillRect(0, 0, TILE, TILE);
 
 const treeBase = document.createElement('canvas');
-treeBase.width = 16; treeBase.height = 16;
+if (globalThis.FRAMES?.tree_oak) {
+  treeBase.width = 32; treeBase.height = 32;
+} else {
+  treeBase.width = 16; treeBase.height = 16;
+}
 const tctx = treeBase.getContext('2d');
 tctx.imageSmoothingEnabled = false;
-drawSprite(tctx, 'tree', 8, 8);
+if (globalThis.FRAMES?.tree_oak) {
+  drawSprite(tctx, 'tree_oak', 16, 24);
+} else {
+  drawSprite(tctx, 'tree', 8, 8);
+}
 
 const waterBase = [];
-for (let f = 0; f < SPRITES.water.length; f++) {
+const waterFrames = (globalThis.ANIMS?.water_loop?.length) || SPRITES.water.length;
+for (let f = 0; f < waterFrames; f++) {
   const c = document.createElement('canvas');
-  c.width = 16; c.height = 16;
-  const wbctx = c.getContext('2d');
-  wbctx.imageSmoothingEnabled = false;
-  drawSprite(wbctx, 'water', 8, 8, { frame: f });
+  if (globalThis.FRAMES?.[`water_${f}`]) {
+    c.width = 32; c.height = 32;
+    const wbctx = c.getContext('2d');
+    wbctx.imageSmoothingEnabled = false;
+    drawSprite(wbctx, `water_${f}`, 16, 16);
+  } else {
+    c.width = 16; c.height = 16;
+    const wbctx = c.getContext('2d');
+    wbctx.imageSmoothingEnabled = false;
+    drawSprite(wbctx, 'water', 8, 8, { frame: f });
+  }
   waterBase.push(c);
 }
 
