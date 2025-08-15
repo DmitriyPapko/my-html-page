@@ -15,6 +15,9 @@ const cvs = document.getElementById('game'), ctx = cvs.getContext('2d'); ctx.ima
 const mini = document.getElementById('minimap'), mctx = mini.getContext('2d'); mctx.imageSmoothingEnabled = false;
 globalThis.drawSprite = (name, x, y, scale = 1, override = {}) => drawSprite(ctx, name, x, y, { scale, override });
 const DPR = Math.max(1, window.devicePixelRatio || 1);
+mini.width = Math.floor(mini.clientWidth * DPR);
+mini.height = Math.floor(mini.clientHeight * DPR);
+mctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 const world = { width: 12000, height: 8000, camX: 0, camY: 0, zoom: 1.25 };
 function resize() { const w = cvs.clientWidth, h = cvs.clientHeight; cvs.width = Math.floor(w * DPR); cvs.height = Math.floor(h * DPR); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
 new ResizeObserver(resize).observe(cvs); resize();
@@ -278,7 +281,7 @@ function drawWeather(dt) {
         invPanel.style.display = 'block'; invGrid.innerHTML = '';
         const cap = 6, arr = (hero.inventory || []).slice(0, cap);
         for (let i = 0; i < cap; i++) {
-          const slot = document.createElement('div'); slot.className = 'invSlot';
+          const slot = document.createElement('div'); slot.className = 'invSlot btn-base';
           if (arr[i]) {
             const it = arr[i]; const inf = itemInfo[it]; const hk = invHotkeys[i];
             const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 32; const cctx = canvas.getContext('2d'); cctx.imageSmoothingEnabled = false;

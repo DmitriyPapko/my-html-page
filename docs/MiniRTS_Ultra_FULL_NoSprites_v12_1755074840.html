@@ -17,8 +17,8 @@
     <span class="pill">💧 Вода: <span id="resWater">0</span></span>
     <span class="pill">👥 Поп: <span id="pop">0</span>/20</span>
     <span class="pill">😴 Idle: <span id="idleWorkers">0</span></span>
-    <button id="btnFog">No Fog</button>
-    <button id="btnPause">Меню</button>
+    <button id="btnFog" class="btn-base">No Fog</button>
+    <button id="btnPause" class="btn-base">Меню</button>
   </div>
 
   <div class="panel" id="unitPanel"></div>
@@ -34,9 +34,9 @@
     </div>
     <div id="expBar"><div id="expFill"></div></div>
     <div class="hero-abilities">
-      <button class="btn" id="ab1">1</button>
-      <button class="btn" id="ab2">2</button>
-      <button class="btn" id="ab3">3</button>
+      <button class="btn-base btn" id="ab1">1</button>
+      <button class="btn-base btn" id="ab2">2</button>
+      <button class="btn-base btn" id="ab3">3</button>
     </div>
     <div id="abilityDesc"></div>
   </div>
@@ -53,9 +53,9 @@
     <div class="card">
       <h3>Выберите героя</h3>
       <div class="heroChoice">
-        <button class="btn heroBtn" data-cls="paladin">Паладин</button>
-        <button class="btn heroBtn" data-cls="rogue">Разбойник</button>
-        <button class="btn heroBtn" data-cls="archmage">Аркан‑маг</button>
+        <button class="btn-base btn heroBtn" data-cls="paladin">Паладин</button>
+        <button class="btn-base btn heroBtn" data-cls="rogue">Разбойник</button>
+        <button class="btn-base btn heroBtn" data-cls="archmage">Аркан‑маг</button>
       </div>
     </div>
   </div>
@@ -66,9 +66,9 @@
       <p>Полный функционал: ИИ, добыча рис/воды, строительство, туман/миником, герои с умениями, лут с нейтралов,
         инвентарь, приоритет отступления и атаки на героя.</p>
       <div class="menu-actions">
-        <button id="btnStart" class="btn">Начать</button>
-        <button id="btnRestart" class="btn">Новая игра</button>
-        <button id="btnMute" class="btn">Звук: вкл</button>
+        <button id="btnStart" class="btn-base btn">Начать</button>
+        <button id="btnRestart" class="btn-base btn">Новая игра</button>
+        <button id="btnMute" class="btn-base btn">Звук: вкл</button>
       </div>
       <div class="menu-tip">ЛКМ — выбор / ПКМ — приказ. Дабл‑клик — выбрать всех юнитов
         типа на экране. WASD — камера. 1/2/3 — умения героя. U — использовать предмет. R — рабочие к работе. B/M/T/L/H —
@@ -80,7 +80,7 @@
     <div class="card">
       <h2 id="resultText">Победа!</h2>
       <div class="center-row">
-        <button id="btnResultRestart" class="btn">В меню</button>
+        <button id="btnResultRestart" class="btn-base btn">В меню</button>
       </div>
     </div>
   </div>
