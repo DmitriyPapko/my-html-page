@@ -272,9 +272,8 @@ export class Unit extends Entity {
           anim,
           globalThis.simTime || 0,
           anim === 'paladin_cast' ? 12 : 10
-        ) || 'paladin_idle_0';
-        globalThis.drawSprite(frame, s.x, s.y, zoom);
-        return;
+        ) || (globalThis.ANIMS[anim] && globalThis.ANIMS[anim][0]);
+        if (frame) { globalThis.drawSprite(frame, s.x, s.y, zoom); return; }
       } else if (this.heroClass === 'rogue') {
         let anim = 'rogue_idle';
         if (this.dead) anim = 'rogue_death';
@@ -285,22 +284,20 @@ export class Unit extends Entity {
           anim,
           globalThis.simTime || 0,
           anim === 'rogue_cast' ? 12 : 10
-        ) || 'rogue_idle_0';
-        globalThis.drawSprite(frame, s.x, s.y, zoom);
-        return;
+        ) || (globalThis.ANIMS[anim] && globalThis.ANIMS[anim][0]);
+        if (frame) { globalThis.drawSprite(frame, s.x, s.y, zoom); return; }
       }
-      let anim = 'mage_idle';
-      if (this.dead) anim = 'mage_death';
-      else if (this.state === 'cast') anim = 'mage_cast';
-      else if (this.state === 'fight') anim = 'mage_attack';
-      else if (this.state === 'move') anim = 'mage_walk';
+      let anim = 'archmage_idle';
+      if (this.dead) anim = 'archmage_death';
+      else if (this.state === 'cast') anim = 'archmage_cast';
+      else if (this.state === 'fight') anim = 'archmage_attack';
+      else if (this.state === 'move') anim = 'archmage_walk';
       const frame = globalThis.nextFrame(
         anim,
         globalThis.simTime || 0,
-        anim === 'mage_cast' ? 12 : 10
-      ) || 'mage_idle_0';
-      globalThis.drawSprite(frame, s.x, s.y, zoom);
-      return;
+        anim === 'archmage_cast' ? 12 : 10
+      ) || (globalThis.ANIMS[anim] && globalThis.ANIMS[anim][0]);
+      if (frame) { globalThis.drawSprite(frame, s.x, s.y, zoom); return; }
     }
     if (this.type === 'worker' && !this.isHero && globalThis.nextFrame) {
       const movingStates = ['move', 'to_node', 'to_hq', 'build'];
@@ -308,8 +305,9 @@ export class Unit extends Entity {
       if (this.state === 'harvest') animName = 'worker_gather';
       else if (movingStates.includes(this.state)) animName = 'worker_walk';
       else if (this.state === 'fight') animName = 'worker_attack';
-      const frame = globalThis.nextFrame(animName, globalThis.simTime || 0) || 'worker_idle_0';
-      globalThis.drawSprite(frame, s.x, s.y, zoom);
+      const frame = globalThis.nextFrame(animName, globalThis.simTime || 0) ||
+        (globalThis.ANIMS[animName] && globalThis.ANIMS[animName][0]) || null;
+      if (frame) { globalThis.drawSprite(frame, s.x, s.y, zoom); return; }
     } else if (globalThis.nextFrame && globalThis.drawSprite && globalThis.FRAMES) {
       let prefix = null;
       if (['soldier', 'archer', 'mage', 'demon', 'elemental'].includes(this.type)) {
@@ -321,8 +319,9 @@ export class Unit extends Entity {
         else if (this.state === 'cast') anim = `${prefix}_cast`;
         else if (this.state === 'fight') anim = `${prefix}_attack`;
         else if (this.state === 'move') anim = `${prefix}_walk`;
-        const frame = globalThis.nextFrame(anim, globalThis.simTime || 0) || `${prefix}_idle_0`;
-        globalThis.drawSprite(frame, s.x, s.y, zoom);
+        const frame = globalThis.nextFrame(anim, globalThis.simTime || 0) ||
+          (globalThis.ANIMS[anim] && globalThis.ANIMS[anim][0]);
+        if (frame) { globalThis.drawSprite(frame, s.x, s.y, zoom); return; }
       } else {
         ctx.save();
         ctx.translate(s.x, s.y);
@@ -742,8 +741,9 @@ export class NeutralCreep extends Entity {
       if (this.dead) anim = `${prefix}_death`;
       else if (this.attackTimer > 0) anim = `${prefix}_attack`;
       else if (this.aggro) anim = `${prefix}_walk`;
-      const frame = globalThis.nextFrame(anim, globalThis.simTime || 0) || `${prefix}_idle_0`;
-      globalThis.drawSprite(frame, s.x, s.y, zoom);
+      const frame = globalThis.nextFrame(anim, globalThis.simTime || 0) ||
+        (globalThis.ANIMS[anim] && globalThis.ANIMS[anim][0]);
+      if (frame) { globalThis.drawSprite(frame, s.x, s.y, zoom); return; }
     } else {
       let band = '#9fb2a1';
       if (this.kind === 'mage') band = '#8ad';
