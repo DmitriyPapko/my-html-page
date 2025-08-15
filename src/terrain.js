@@ -1,4 +1,4 @@
-import { drawSprite, SPRITES } from './sprites.js';
+import { drawSprite, SPRITES, drawTile } from './sprites.js';
 import { WATER, RICE } from './config/visual.js';
 
 /* ==== Terrain generation and blockers ==== */
@@ -96,36 +96,29 @@ export function genBlockers() {
 }
 
 export function drawTerrain() {
-  const { world, cvs, worldToScreen, ctx, toPixel } = globalThis;
-  const step = TILE;
-  const startX = Math.floor(world.camX / step) * step;
-  const startY = Math.floor(world.camY / step) * step;
-  const endX = world.camX + cvs.width / world.zoom;
-  const endY = world.camY + cvs.height / world.zoom;
-  for (let y = startY; y <= endY; y += step) {
-    for (let x = startX; x <= endX; x += step) {
-      const s = worldToScreen(x, y);
-      const tx = Math.floor(x / step), ty = Math.floor(y / step);
-      const kind = ((hash(tx, ty) & 255) < 10) ? 'water' : 'grass';
-      if (!drawTileSprite(ctx, { kind, x: tx, y: ty }, s.x, s.y, world.zoom)) {
-        const dx = toPixel ? toPixel(s.x) : s.x;
-        const dy = toPixel ? toPixel(s.y) : s.y;
-        const size = step * world.zoom;
-        if (kind === 'water') {
-          ctx.drawImage(waterTile, dx, dy, size, size);
-          const t = (globalThis.simTime || 0) * WATER.waveSpeed;
-          ctx.save();
-          ctx.globalAlpha = 0.2;
-          ctx.fillStyle = '#fff';
-          for (let i = 0; i < size; i += 8) {
-            const ry = Math.sin((i / size + t) * Math.PI * 2) * WATER.waveAmp;
-            ctx.fillRect(dx + i, dy + size / 2 + ry, 8, WATER.rippleScale * size);
-          }
-          ctx.restore();
-        } else {
-          ctx.drawImage(grassTile, dx, dy, size, size);
-        }
+  const { ctx, world } = globalThis;
+  const TS = 32;
+  const cam = { x: world.camX, y: world.camY };
+  const zoom = world.zoom;
+
+  const i0 = Math.floor(cam.x / TS);
+  const j0 = Math.floor(cam.y / TS);
+  const cols = Math.ceil(ctx.canvas.width / (TS * zoom)) + 2;
+  const rows = Math.ceil(ctx.canvas.height / (TS * zoom)) + 2;
+
+  for (let j = j0; j < j0 + rows; j++) {
+    for (let i = i0; i < i0 + cols; i++) {
+      const kind = ((hash(i, j) & 255) < 10) ? 'water' : 'grass';
+      let name = null;
+      if (kind === 'water') {
+        name = globalThis.nextFrame ? globalThis.nextFrame('water_loop', globalThis.simTime || 0, 8) : 'water_0';
+      } else if (kind === 'grass') {
+        const h = ((i * 73856093) ^ (j * 19349663)) & 3;
+        name = h === 0 ? 'grass_flowers' : (h & 1 ? 'grass_A' : 'grass_B');
+      } else if (kind === 'dirt') {
+        name = 'dirt';
       }
+      drawTile(name, i, j, TS, cam.x, cam.y, zoom, ctx);
     }
   }
 }

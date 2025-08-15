@@ -419,6 +419,63 @@ export function nextFrame(anim, t, fps = 10) {
   return seq[idx];
 }
 
+// выбрать правильный атлас по имени кадра
+export function pickSpriteImage(name) {
+  if (name.startsWith('worker_')) return globalThis.__SPRITE_IMG_WORKER__;
+  if (name.startsWith('mage_')) return globalThis.__SPRITE_IMG_MAGE__;
+  if (
+    name.startsWith('grass_') ||
+    name.startsWith('water_') ||
+    name === 'dirt' ||
+    name.startsWith('tree_')
+  )
+    return globalThis.__SPRITE_IMG_TERRAIN__;
+  return globalThis.__SPRITE_IMG__;
+}
+
+/**
+ * Рисует ТАЙЛ (top-left). Игнорирует anchor из JSON.
+ * tileX/tileY — индексы клетки (в тайлах), ts — размер тайла (32).
+ * camX/camY — смещение камеры в мировых координатах (в пикселях тайловой сетки).
+ */
+export function drawTile(
+  name,
+  tileX,
+  tileY,
+  ts,
+  camX,
+  camY,
+  zoom,
+  ctx = globalThis.ctx
+) {
+  const F = globalThis.FRAMES?.[name];
+  const IMG = pickSpriteImage(name);
+  if (!F || !IMG) return;
+
+  // мировые координаты верхнего-левого угла клетки:
+  const wx = tileX * ts;
+  const wy = tileY * ts;
+
+  // экранные координаты с СНАПом к целым пикселям:
+  const sx = Math.floor((wx - camX) * zoom);
+  const sy = Math.floor((wy - camY) * zoom);
+  const sw = Math.ceil(ts * zoom);
+  const sh = Math.ceil(ts * zoom);
+
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(
+    IMG,
+    F.frame.x,
+    F.frame.y,
+    F.frame.w,
+    F.frame.h,
+    sx,
+    sy,
+    sw,
+    sh
+  );
+}
+
 const CACHE = new Map();
 const CACHE_LIMIT = 200;
 
