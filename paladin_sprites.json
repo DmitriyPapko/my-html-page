@@ -1,0 +1,427 @@
+{
+  "image": "docs/paladin_sprites.png",
+  "tile": {
+    "w": 32,
+    "h": 32
+  },
+  "frames": {
+    "paladin_idle_0": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_idle_1": {
+      "frame": {
+        "x": 32,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_idle_2": {
+      "frame": {
+        "x": 64,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_idle_3": {
+      "frame": {
+        "x": 96,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_walk_0": {
+      "frame": {
+        "x": 0,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_walk_1": {
+      "frame": {
+        "x": 32,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_walk_2": {
+      "frame": {
+        "x": 64,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_walk_3": {
+      "frame": {
+        "x": 96,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_walk_4": {
+      "frame": {
+        "x": 128,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_walk_5": {
+      "frame": {
+        "x": 160,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_cast_0": {
+      "frame": {
+        "x": 0,
+        "y": 64,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_cast_1": {
+      "frame": {
+        "x": 32,
+        "y": 64,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_cast_2": {
+      "frame": {
+        "x": 64,
+        "y": 64,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_cast_3": {
+      "frame": {
+        "x": 96,
+        "y": 64,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_cast_4": {
+      "frame": {
+        "x": 128,
+        "y": 64,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_cast_5": {
+      "frame": {
+        "x": 160,
+        "y": 64,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_attack_0": {
+      "frame": {
+        "x": 0,
+        "y": 96,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_attack_1": {
+      "frame": {
+        "x": 32,
+        "y": 96,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_attack_2": {
+      "frame": {
+        "x": 64,
+        "y": 96,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_attack_3": {
+      "frame": {
+        "x": 96,
+        "y": 96,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_attack_4": {
+      "frame": {
+        "x": 128,
+        "y": 96,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_block_0": {
+      "frame": {
+        "x": 0,
+        "y": 128,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_block_1": {
+      "frame": {
+        "x": 32,
+        "y": 128,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_block_2": {
+      "frame": {
+        "x": 64,
+        "y": 128,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_block_3": {
+      "frame": {
+        "x": 96,
+        "y": 128,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_death_0": {
+      "frame": {
+        "x": 0,
+        "y": 160,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_death_1": {
+      "frame": {
+        "x": 32,
+        "y": 160,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_death_2": {
+      "frame": {
+        "x": 64,
+        "y": 160,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_death_3": {
+      "frame": {
+        "x": 96,
+        "y": 160,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_death_4": {
+      "frame": {
+        "x": 128,
+        "y": 160,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    },
+    "paladin_death_5": {
+      "frame": {
+        "x": 160,
+        "y": 160,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 16,
+        "y": 26
+      }
+    }
+  },
+  "animations": {
+    "paladin_idle": [
+      "paladin_idle_0",
+      "paladin_idle_1",
+      "paladin_idle_2",
+      "paladin_idle_3"
+    ],
+    "paladin_walk": [
+      "paladin_walk_0",
+      "paladin_walk_1",
+      "paladin_walk_2",
+      "paladin_walk_3",
+      "paladin_walk_4",
+      "paladin_walk_5"
+    ],
+    "paladin_cast": [
+      "paladin_cast_0",
+      "paladin_cast_1",
+      "paladin_cast_2",
+      "paladin_cast_3",
+      "paladin_cast_4",
+      "paladin_cast_5"
+    ],
+    "paladin_attack": [
+      "paladin_attack_0",
+      "paladin_attack_1",
+      "paladin_attack_2",
+      "paladin_attack_3",
+      "paladin_attack_4"
+    ],
+    "paladin_block": [
+      "paladin_block_0",
+      "paladin_block_1",
+      "paladin_block_2",
+      "paladin_block_3"
+    ],
+    "paladin_death": [
+      "paladin_death_0",
+      "paladin_death_1",
+      "paladin_death_2",
+      "paladin_death_3",
+      "paladin_death_4",
+      "paladin_death_5"
+    ]
+  },
+  "version": 1
+}
