@@ -1,4 +1,6 @@
 /* ==== Menu & toggles ==== */
+import state from './state.js';
+
 const menu = document.getElementById('menu');
 const btnStart = document.getElementById('btnStart');
 const btnRestart = document.getElementById('btnRestart');
@@ -11,38 +13,38 @@ const btnResultRestart = document.getElementById('btnResultRestart');
 const idleWorkersEl = document.getElementById('idleWorkers');
 globalThis.idleWorkersEl = idleWorkersEl;
 
-globalThis.paused = true;
-globalThis.muted = false;
-globalThis.fogEnabled = true;
+state.paused = true;
+state.muted = false;
+state.fogEnabled = true;
 
 btnStart.onclick = async () => {
   resultMenu.style.display = 'none';
   menu.style.display = 'none';
   await globalThis.resetGame();
-  globalThis.paused = false;
+  state.paused = false;
 };
 btnRestart.onclick = async () => {
   resultMenu.style.display = 'none';
   menu.style.display = 'none';
   await globalThis.resetGame();
-  globalThis.paused = false;
+  state.paused = false;
 };
-btnMute.onclick = () => { globalThis.muted = !globalThis.muted; btnMute.textContent = globalThis.muted ? 'Звук: выкл' : 'Звук: вкл'; };
+btnMute.onclick = () => { state.muted = !state.muted; btnMute.textContent = state.muted ? 'Звук: выкл' : 'Звук: вкл'; };
 btnPause.onclick = () => {
-  globalThis.paused = !globalThis.paused;
-  if (globalThis.paused) document.getElementById('heroSelect').style.display = 'none';
-  menu.style.display = globalThis.paused ? 'flex' : 'none';
+  state.paused = !state.paused;
+  if (state.paused) document.getElementById('heroSelect').style.display = 'none';
+  menu.style.display = state.paused ? 'flex' : 'none';
 };
-btnFog.onclick = () => { globalThis.fogEnabled = !globalThis.fogEnabled; btnFog.textContent = globalThis.fogEnabled ? 'No Fog' : 'Fog'; };
+btnFog.onclick = () => { state.fogEnabled = !state.fogEnabled; btnFog.textContent = state.fogEnabled ? 'No Fog' : 'Fog'; };
 
 btnResultRestart.onclick = () => {
   resultMenu.style.display = 'none';
   menu.style.display = 'flex';
-  globalThis.paused = true;
+  state.paused = true;
 };
 
 globalThis.showResultMenu = (msg) => {
-  globalThis.paused = true;
+  state.paused = true;
   if (globalThis.setHeroUI) globalThis.setHeroUI(null);
   resultText.textContent = msg;
   menu.style.display = 'none';

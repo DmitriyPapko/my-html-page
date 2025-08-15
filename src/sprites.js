@@ -215,6 +215,15 @@ export const SPRITES = {
 };
 
 const CACHE = new Map();
+const CACHE_LIMIT = 200;
+
+function stableKey(obj) {
+  const sorted = Object.keys(obj).sort().reduce((acc, k) => {
+    acc[k] = obj[k];
+    return acc;
+  }, {});
+  return JSON.stringify(sorted);
+}
 
 export function drawSprite(ctx, name, x, y, opts = {}) {
   const spr = SPRITES[name];
@@ -233,7 +242,7 @@ export function drawSprite(ctx, name, x, y, opts = {}) {
   const h = spr.length;
   let canvas = null;
   if (!flipX && !flipY && !rotate && alpha === 1 && !shadow) {
-    const key = name + '@' + scale + '@' + JSON.stringify(override);
+    const key = name + '@' + scale + '@' + stableKey(override);
     canvas = CACHE.get(key);
     if (!canvas) {
       canvas = document.createElement('canvas');
@@ -252,6 +261,10 @@ export function drawSprite(ctx, name, x, y, opts = {}) {
         }
       }
       CACHE.set(key, canvas);
+      if (CACHE.size > CACHE_LIMIT) {
+        const firstKey = CACHE.keys().next().value;
+        CACHE.delete(firstKey);
+      }
     }
   }
   const tp = globalThis.toPixel || (v => v);

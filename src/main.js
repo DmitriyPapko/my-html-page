@@ -1,10 +1,12 @@
 import { drawSprite } from "./sprites.js";
 import { Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, getById, enemiesFor, allUnits, allStructures, nearestNode, lootFromTier } from "./entities.js";
+import state from './state.js';
 import { FireAuraEffect } from "./effects/FireAuraEffect.js";
 
 /* ==== Helpers ==== */
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rand = (a, b) => a + Math.random() * (b - a);
+state.rand = rand;
 const dist2 = (x1, y1, x2, y2) => { const dx = x2 - x1, dy = y2 - y1; return dx * dx + dy * dy; };
 
 /* ==== Canvas & camera ==== */
@@ -38,12 +40,12 @@ function drawShadow(x, y, r) { ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.25)'; c
 Object.assign(globalThis, { clamp, rand, dist2, cvs, ctx, mini, mctx, DPR, world, screenToWorld, worldToScreen, clampCam, toPixel, drawShadow });
 
 // provide a default isBlocked implementation until terrain initializes
-globalThis.isBlocked = globalThis.isBlocked || (() => false);
+state.isBlocked = state.isBlocked || (() => false);
 
 /* ==== Audio (простые огибающие без внешних файлов) ==== */
 const AC = window.AudioContext ? new AudioContext() : null;
 function beep(freq = 440, dur = 0.08, type = 'triangle', gain = 0.06) {
-  if (globalThis.muted || !AC) return;
+  if (state.muted || !AC) return;
   const o = AC.createOscillator(), g = AC.createGain();
   o.type = type; o.frequency.value = freq; o.connect(g); g.connect(AC.destination); g.gain.value = gain;
   o.start(); g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + dur); o.stop(AC.currentTime + dur);
@@ -51,7 +53,7 @@ function beep(freq = 440, dur = 0.08, type = 'triangle', gain = 0.06) {
 globalThis.beep = beep;
 
 function playSfx(name) {
-  if (globalThis.muted || !AC) return;
+  if (state.muted || !AC) return;
   if (name === 'denied') {
     const o = AC.createOscillator(), g = AC.createGain();
     o.type = 'sine';
@@ -100,6 +102,7 @@ function drawWeather(dt) {
         { name: 'AI‑1', color: '#e05dff', res: { rice: 220, water: 100 }, units: [], structures: [], hero: null, ai: true, aiPlan: null, difficulty: 'easy', controller: null },
         { name: 'AI‑2', color: '#ffd27a', res: { rice: 220, water: 100 }, units: [], structures: [], hero: null, ai: true, aiPlan: null, difficulty: 'hard', controller: null }
       ];
+      state.players = players;
       const riceNodes = [], waterNodes = [];
       const resUI = { rice: document.getElementById('resRice'), water: document.getElementById('resWater'), pop: document.getElementById('pop'), idle: document.getElementById('idleWorkers') };
       const POP_CAP = 20;
@@ -115,7 +118,7 @@ function drawWeather(dt) {
       function canPlaceBuildingAt(x, y) {
         const R = 40;
         if (x < R || y < R || x > world.width - R || y > world.height - R) return false;
-        if (globalThis.isBlocked && globalThis.isBlocked(x, y)) return false;
+        if (state.isBlocked && state.isBlocked(x, y)) return false;
         for (const n of riceNodes) { if (dist2(x, y, n.x, n.y) <= (n.radius + R) * (n.radius + R)) return false; }
         for (const n of waterNodes) { if (dist2(x, y, n.x, n.y) <= (n.radius + R) * (n.radius + R)) return false; }
         for (const p of players) { for (const s of p.structures) { if (dist2(x, y, s.x, s.y) <= (s.radius + R) * (s.radius + R)) return false; } }
@@ -146,7 +149,7 @@ function drawWeather(dt) {
         if (unitType === 'archer') { u.dps = 20; u.maxHp = 120; u.hp = 120; u.attackRange = 250; u.vision = 520; u.regen = 0.25; }
         if (unitType === 'mage') { u.dps = 22; u.maxHp = 110; u.hp = 110; u.attackRange = 210; u.regen = 0.25; }
         players[owner].units.push(u);
-        if (!muted) beep(520, 0.06, 'sawtooth', 0.04);
+        if (!state.muted) beep(520, 0.06, 'sawtooth', 0.04);
         return true;
       }
 
@@ -156,7 +159,7 @@ function drawWeather(dt) {
           COSTS,
           POP_CAP,
           placeGhost,
-          isBlocked: (...args) => globalThis.isBlocked(...args),
+          isBlocked: (...args) => state.isBlocked(...args),
           neutral,
           dist2,
         };
@@ -164,7 +167,7 @@ function drawWeather(dt) {
 
       function getUnitDeps() {
         return {
-          isBlocked: (...args) => globalThis.isBlocked(...args),
+          isBlocked: (...args) => state.isBlocked(...args),
           rand,
           players,
         };
@@ -297,23 +300,23 @@ function drawWeather(dt) {
         const sign = remove ? -1 : 1;
         if (itemKind === 'scroll_hp') {
           if (remove) return;
-          hero.maxHp += 80; hero.hp = Math.min(hero.maxHp, hero.hp + 120); if (typeof beep === 'function' && !muted) beep(620, 0.08, 'triangle', 0.05);
+          hero.maxHp += 80; hero.hp = Math.min(hero.maxHp, hero.hp + 120); if (typeof beep === 'function' && !state.muted) beep(620, 0.08, 'triangle', 0.05);
         } else if (itemKind === 'scroll_dps') {
           if (remove) return;
-          hero.dps += 10; hero.auraTimer = 20; if (typeof beep === 'function' && !muted) beep(720, 0.08, 'square', 0.06);
+          hero.dps += 10; hero.auraTimer = 20; if (typeof beep === 'function' && !state.muted) beep(720, 0.08, 'square', 0.06);
           setTimeout(() => { hero.dps -= 10; }, 20000);
         } else if (itemKind === 'scroll_fire_aura') {
           if (remove) return;
           hero.effects.push(new FireAuraEffect({ radius: 100, dpsPerTick: 10, tickMs: 1000, durationMs: 20000 }));
-          if (typeof beep === 'function' && !muted) beep(640, 0.08, 'sawtooth', 0.06);
+          if (typeof beep === 'function' && !state.muted) beep(640, 0.08, 'sawtooth', 0.06);
         } else if (itemKind === 'ring_atk') {
-          hero.maxMp += 40 * sign; hero.mp += 40 * sign; if (!remove && typeof beep === 'function' && !muted) beep(540, 0.08, 'sawtooth', 0.05);
+          hero.maxMp += 40 * sign; hero.mp += 40 * sign; if (!remove && typeof beep === 'function' && !state.muted) beep(540, 0.08, 'sawtooth', 0.05);
         } else if (itemKind === 'boots') {
-          hero.baseSpeed += 20 * sign; hero.speed += 20 * sign; if (!remove && typeof beep === 'function' && !muted) beep(480, 0.08, 'square', 0.05);
+          hero.baseSpeed += 20 * sign; hero.speed += 20 * sign; if (!remove && typeof beep === 'function' && !state.muted) beep(480, 0.08, 'square', 0.05);
         } else if (itemKind === 'amulet') {
-          hero.maxHp += 120 * sign; hero.hp += 120 * sign; if (!remove && typeof beep === 'function' && !muted) beep(660, 0.08, 'triangle', 0.05);
+          hero.maxHp += 120 * sign; hero.hp += 120 * sign; if (!remove && typeof beep === 'function' && !state.muted) beep(660, 0.08, 'triangle', 0.05);
         } else if (itemKind === 'orb') {
-          hero.maxMp += 60 * sign; hero.mp += 60 * sign; if (!remove && typeof beep === 'function' && !muted) beep(580, 0.08, 'sawtooth', 0.05);
+          hero.maxMp += 60 * sign; hero.mp += 60 * sign; if (!remove && typeof beep === 'function' && !state.muted) beep(580, 0.08, 'sawtooth', 0.05);
         }
         if (hero.owner === 0) setHeroUI(hero);
       }
@@ -365,7 +368,7 @@ function drawWeather(dt) {
       window.addEventListener('keydown', e => {
         const k = e.key.toLowerCase();
         input.keys[k] = true;
-        if (k === 'f') globalThis.fogEnabled = !globalThis.fogEnabled;
+        if (k === 'f') state.fogEnabled = !state.fogEnabled;
         if (k === '1') tryCast(1);
         if (k === '2') tryCast(2);
         if (k === '3') tryCast(3);
@@ -609,7 +612,7 @@ globalThis.drawHp = drawHp;
       function loop(t) {
         const dt = Math.min(0.033, (t - last) / 1000); last = t; simTime += dt;
         clearVisible(); for (const s of players[0].structures) revealCircle(s.x, s.y, 520); for (const u of players[0].units) revealCircle(u.x, u.y, 480);
-        if (!globalThis.paused) {
+        if (!state.paused) {
           const sp = 900 / world.zoom; if (input.keys['w'] || input.keys['ц']) world.camY -= sp * dt; if (input.keys['s'] || input.keys['ы']) world.camY += sp * dt; if (input.keys['a'] || input.keys['ф']) world.camX -= sp * dt; if (input.keys['d'] || input.keys['в']) world.camX += sp * dt; clampCam();
           for (const p of players) {
             for (const s of p.structures) s.update(dt);

@@ -1,7 +1,13 @@
 /* ==== Entities ==== */
+import state from './state.js';
+
+export function defaultRand(min = 0, max = 1) {
+  return Math.random() * (max - min) + min;
+}
+
 let nextId = 1;
 
-function moveEntity(e, dx, dy, v, dt, isBlocked = globalThis.isBlocked) {
+function moveEntity(e, dx, dy, v, dt, isBlocked = state.isBlocked) {
   const d = Math.hypot(dx, dy);
   if (d <= 0) return;
   const nx = e.x + (dx / d) * v * dt, ny = e.y + (dy / d) * v * dt;
@@ -49,9 +55,9 @@ export class Unit extends Entity {
   constructor(x, y, owner, type = 'worker', deps = {}) {
     super(x, y, owner);
     this.deps = {
-      isBlocked: deps.isBlocked || globalThis.isBlocked || (() => false),
-      rand: deps.rand || globalThis.rand || Math.random,
-      players: deps.players || globalThis.players || [],
+      isBlocked: deps.isBlocked || state.isBlocked || (() => false),
+      rand: deps.rand || state.rand || defaultRand,
+      players: deps.players || state.players || [],
     };
     this.type = type;
     this.radius = 12;
