@@ -1,5 +1,6 @@
 import { drawSprite, SPRITES, drawTile } from './sprites.js';
 import { WATER, RICE } from './config/visual.js';
+import { generateTerrain } from './terrainGen.js';
 
 /* ==== Terrain generation and blockers ==== */
 const blockers = []; // {x,y,r,kind}
@@ -56,30 +57,20 @@ for (let f = 0; f < waterFrames; f++) {
   }
   waterBase.push(c);
 }
-
-function hash(x, y) {
-  let h = x * 374761393 + y * 668265263;
-  h = (h ^ (h >> 13)) >>> 0;
-  return h;
-}
-
-function drawTileSprite(ctx, tile, sx, sy, zoom) {
-  if (!globalThis.drawSprite || !globalThis.FRAMES) return false;
-  let name = null;
-
-  if (tile.kind === 'water') {
-    name = globalThis.nextFrame ? globalThis.nextFrame('water_loop', globalThis.simTime || 0, 8) : 'water_0';
-  } else if (tile.kind === 'grass') {
-    const h = (tile.x * 73856093 ^ tile.y * 19349663) & 3;
-    name = h === 0 ? 'grass_flowers' : (h & 1 ? 'grass_A' : 'grass_B');
-  } else if (tile.kind === 'dirt') {
-    name = 'dirt';
-  }
-
-  if (!name || !globalThis.FRAMES[name]) return false;
-  globalThis.drawSprite(name, sx, sy, zoom);
-  return true;
-}
+const TS = 32;
+const WIDTH_IN_TILES = Math.ceil(globalThis.world.width / TS);
+const HEIGHT_IN_TILES = Math.ceil(globalThis.world.height / TS);
+const terrain = generateTerrain(WIDTH_IN_TILES, HEIGHT_IN_TILES, {
+  seed: Date.now() % 1e9,
+  maxLakes: 3,
+  lakeMinDist: 22,
+  lakeRadius: [10, 18],
+  minLakeSize: 60,
+  waterCoverageMax: 0.10,
+  flowerRate: 0.012,
+  flowerMinDist: 2
+});
+const tileAt = (i, j) => terrain[j]?.[i] ?? { kind: 'grass_A' };
 
 export function genBlockers() {
   const { rand, clamp, world } = globalThis;
@@ -97,7 +88,6 @@ export function genBlockers() {
 
 export function drawTerrain() {
   const { ctx, world } = globalThis;
-  const TS = 32;
   const cam = { x: world.camX, y: world.camY };
   const zoom = world.zoom;
 
@@ -108,22 +98,10 @@ export function drawTerrain() {
 
   for (let j = j0; j < j0 + rows; j++) {
     for (let i = i0; i < i0 + cols; i++) {
-      const kind = ((hash(i, j) & 255) < 10) ? 'water' : 'grass';
-      let name = null;
-      if (kind === 'water') {
-        // When the water animation atlas hasn't loaded yet, nextFrame may
-        // return null which previously resulted in an undefined sprite name
-        // being passed to drawTile. Fallback to the first frame to avoid
-        // runtime errors and ensure water tiles still render.
-        const frame = globalThis.nextFrame
-          ? globalThis.nextFrame('water_loop', globalThis.simTime || 0, 8)
-          : null;
-        name = frame || 'water_0';
-      } else if (kind === 'grass') {
-        const h = ((i * 73856093) ^ (j * 19349663)) & 3;
-        name = h === 0 ? 'grass_flowers' : (h & 1 ? 'grass_A' : 'grass_B');
-      } else if (kind === 'dirt') {
-        name = 'dirt';
+      const tile = tileAt(i, j);
+      let name = tile.kind;
+      if (tile.kind === 'water') {
+        name = globalThis.nextFrame ? globalThis.nextFrame('water_loop', globalThis.simTime || 0, 8) : 'water_0';
       }
       drawTile(name, i, j, TS, cam.x, cam.y, zoom, ctx);
     }
