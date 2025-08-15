@@ -9,6 +9,8 @@ const DIFFICULTY_CONFIG = {
     pushAt: 8,
     aggression: 0.5,
     buildInterval: 4,
+    resourcePriorities: { rice: 0.6, water: 0.4 },
+    scoutFrequency: 400,
   },
   normal: {
     comp: { soldier: 0.4, archer: 0.4, mage: 0.2 },
@@ -16,6 +18,8 @@ const DIFFICULTY_CONFIG = {
     pushAt: 10,
     aggression: 0.7,
     buildInterval: 6,
+    resourcePriorities: { rice: 0.5, water: 0.5 },
+    scoutFrequency: 300,
   },
   hard: {
     comp: { soldier: 0.3, archer: 0.4, mage: 0.3 },
@@ -23,6 +27,8 @@ const DIFFICULTY_CONFIG = {
     pushAt: 8,
     aggression: 1.0,
     buildInterval: 10,
+    resourcePriorities: { rice: 0.4, water: 0.6 },
+    scoutFrequency: 200,
   },
 };
 
@@ -35,6 +41,7 @@ function aiInitPlan(P, level = 'normal') {
     pushAt: cfg.pushAt,
     nextBuild: 0,
     aggression: cfg.aggression,
+    baseAggression: cfg.aggression,
     buildInterval: cfg.buildInterval,
     buildTimer: 0,
     buildFailCount: 0,
@@ -44,6 +51,8 @@ function aiInitPlan(P, level = 'normal') {
     minReserve: { ...AI_THRESHOLDS.minReserve },
     // Additional fields for extended scenarios
     scoutTimer: 0,
+    scoutFrequency: cfg.scoutFrequency,
+    resourcePriorities: { ...cfg.resourcePriorities },
     finalPush: false,
     battleHistory: [],
   };
@@ -92,7 +101,27 @@ class AIController {
       this.player.aiPlan.buildTimer -= dt;
       if (this.player.aiPlan.buildTimer < 0) this.player.aiPlan.buildTimer = 0;
     }
+    this.evaluateAggression();
     this.behavior.tick({ dt, controller: this });
+  }
+
+  evaluateAggression() {
+    const P = this.player;
+    const { players } = this.deps;
+    const enemies = players
+      .filter((pl, idx) => idx !== this.id && !(pl.teamId !== undefined && P.teamId !== undefined && pl.teamId === P.teamId))
+      .flatMap(pl => pl.units.filter(u => !u.dead));
+    const enemyP = packPower(enemies);
+    const ourP = packPower(P.units.filter(u => !u.dead));
+    const totalStructs = players.reduce((sum, pl) => sum + pl.structures.length, 0);
+    const mapControl = totalStructs ? P.structures.length / totalStructs : 0.5;
+    const base = P.aiPlan.baseAggression || 1;
+    let newAgg = base * (ourP / Math.max(enemyP, 1)) * (0.5 + mapControl);
+    newAgg = Math.max(0.1, Math.min(newAgg, 2));
+    if (Math.abs(newAgg - P.aiPlan.aggression) > 0.01) {
+      P.aiPlan.aggression = newAgg;
+      if (DEBUG_AI) console.log('aggression', newAgg.toFixed(2));
+    }
   }
 
   // Actions derived from original aiThink
@@ -186,10 +215,20 @@ class AIController {
         success = false;
       }
     }
-    const unassigned = P.units.filter(u => u.type === 'worker' && (u.role === null || u.role === undefined));
+    const workers = P.units.filter(u => u.type === 'worker');
+    const riceWorkers = workers.filter(u => u.role === 'rice');
+    const waterWorkers = workers.filter(u => u.role === 'water');
+    const priorities = P.aiPlan.resourcePriorities || { rice: 0.5, water: 0.5 };
+    const desiredRice = Math.round(workers.length * priorities.rice);
+    const unassigned = workers.filter(u => u.role !== 'rice' && u.role !== 'water');
     for (const worker of unassigned) {
-      const resType = P.res.rice < P.res.water ? 'rice' : 'water';
-      worker.role = resType;
+      if (riceWorkers.length < desiredRice) {
+        worker.role = 'rice';
+        riceWorkers.push(worker);
+      } else {
+        worker.role = 'water';
+        waterWorkers.push(worker);
+      }
       worker.state = 'idle';
     }
     return success;
@@ -273,10 +312,11 @@ class AIController {
       const px = (Math.random() - 0.5) * 800;
       const py = (Math.random() - 0.5) * 800;
       scout.setDest(px, py);
-      P.aiPlan.scoutTimer = 300;
+      P.aiPlan.scoutTimer = P.aiPlan.scoutFrequency;
+      if (DEBUG_AI) console.log('scout to', px, py);
       return true;
     }
-    P.aiPlan.scoutTimer = 300; // reset timer
+    P.aiPlan.scoutTimer = P.aiPlan.scoutFrequency; // reset timer
     return false;
   }
 
@@ -463,6 +503,7 @@ class AIController {
       });
       if (best) {
         army.forEach(u => { if (!u.retreat) u.setTarget(best); });
+        if (DEBUG_AI) console.log('rally target', best.kind || 'unit');
         return true;
       }
       return false;
