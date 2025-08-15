@@ -43,6 +43,24 @@ function hash(x, y) {
   return h;
 }
 
+function drawTileSprite(ctx, tile, sx, sy, zoom) {
+  if (!globalThis.drawSprite || !globalThis.FRAMES) return false;
+  let name = null;
+
+  if (tile.kind === 'water') {
+    name = globalThis.nextFrame ? globalThis.nextFrame('water_loop', globalThis.simTime || 0, 8) : 'water_0';
+  } else if (tile.kind === 'grass') {
+    const h = (tile.x * 73856093 ^ tile.y * 19349663) & 3;
+    name = h === 0 ? 'grass_flowers' : (h & 1 ? 'grass_A' : 'grass_B');
+  } else if (tile.kind === 'dirt') {
+    name = 'dirt';
+  }
+
+  if (!name || !globalThis.FRAMES[name]) return false;
+  globalThis.drawSprite(name, sx, sy, zoom);
+  return true;
+}
+
 export function genBlockers() {
   const { rand, clamp, world } = globalThis;
   blockers.length = 0;
@@ -67,22 +85,26 @@ export function drawTerrain() {
   for (let y = startY; y <= endY; y += step) {
     for (let x = startX; x <= endX; x += step) {
       const s = worldToScreen(x, y);
-      const dx = toPixel ? toPixel(s.x) : s.x;
-      const dy = toPixel ? toPixel(s.y) : s.y;
-      const size = step * world.zoom;
-      ctx.drawImage(grassTile, dx, dy, size, size);
       const tx = Math.floor(x / step), ty = Math.floor(y / step);
-      if ((hash(tx, ty) & 255) < 10) {
-        ctx.drawImage(waterTile, dx, dy, size, size);
-        const t = (globalThis.simTime || 0) * WATER.waveSpeed;
-        ctx.save();
-        ctx.globalAlpha = 0.2;
-        ctx.fillStyle = '#fff';
-        for (let i = 0; i < size; i += 8) {
-          const ry = Math.sin((i / size + t) * Math.PI * 2) * WATER.waveAmp;
-          ctx.fillRect(dx + i, dy + size / 2 + ry, 8, WATER.rippleScale * size);
+      const kind = ((hash(tx, ty) & 255) < 10) ? 'water' : 'grass';
+      if (!drawTileSprite(ctx, { kind, x: tx, y: ty }, s.x, s.y, world.zoom)) {
+        const dx = toPixel ? toPixel(s.x) : s.x;
+        const dy = toPixel ? toPixel(s.y) : s.y;
+        const size = step * world.zoom;
+        if (kind === 'water') {
+          ctx.drawImage(waterTile, dx, dy, size, size);
+          const t = (globalThis.simTime || 0) * WATER.waveSpeed;
+          ctx.save();
+          ctx.globalAlpha = 0.2;
+          ctx.fillStyle = '#fff';
+          for (let i = 0; i < size; i += 8) {
+            const ry = Math.sin((i / size + t) * Math.PI * 2) * WATER.waveAmp;
+            ctx.fillRect(dx + i, dy + size / 2 + ry, 8, WATER.rippleScale * size);
+          }
+          ctx.restore();
+        } else {
+          ctx.drawImage(grassTile, dx, dy, size, size);
         }
-        ctx.restore();
       }
     }
   }
@@ -96,8 +118,13 @@ export function drawBlockers() {
     const dx = toPixel ? toPixel(topLeft.x) : topLeft.x;
     const dy = toPixel ? toPixel(topLeft.y) : topLeft.y;
     if (b.kind === 'tree') {
-      drawShadow(topLeft.x + size / 2, topLeft.y + size * 0.75, size * 0.5);
-      ctx.drawImage(treeBase, dx, dy, size, size);
+      const center = worldToScreen(b.x, b.y);
+      drawShadow(center.x, center.y + size * 0.25, size * 0.5);
+      if (!globalThis.drawSprite || !globalThis.FRAMES || !globalThis.FRAMES['tree_oak']) {
+        ctx.drawImage(treeBase, dx, dy, size, size);
+      } else {
+        globalThis.drawSprite('tree_oak', center.x, center.y, world.zoom);
+      }
     } else {
       const frame = Math.floor((globalThis.simTime || 0) * WATER.animSpeed) % waterBase.length;
       ctx.drawImage(waterBase[frame], dx, dy, size, size);

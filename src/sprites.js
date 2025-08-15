@@ -356,38 +356,57 @@ export const SPRITES = {
 
 // Sprite atlas support
 let FRAMES = {}, ANIMS = {};
+globalThis.FRAMES = FRAMES;
+globalThis.ANIMS = ANIMS;
 
-async function loadAtlas(jsonUrl) {
-  try {
-    const meta = await fetch(jsonUrl).then(r => r.json());
-    const img = new Image(); img.decoding = 'async';
-    const base = new URL(jsonUrl, typeof location !== 'undefined' ? location.href : 'https://example.com/');
-    const src = meta.imageData || meta.image || jsonUrl.replace('.json', '.png');
-    img.src = meta.imageData ? src : new URL(src, base).toString();
-    await img.decode();
-    return { img, meta };
-  } catch (e) {
-    return null;
-  }
+const __DOCS = new URL('../docs/', import.meta.url);
+async function __loadAtlas(name) {
+  const u1 = new URL(name, __DOCS).href;
+  let res = await fetch(u1).catch(() => null);
+  if (!res || !res.ok) res = await fetch(name).catch(() => null);
+  if (!res || !res.ok) throw new Error('Failed to load ' + name);
+  const meta = await res.json();
+  const img = new Image(); img.decoding = 'async';
+  img.src = meta.imageData || new URL(meta.image || name.replace('.json', '.png'), __DOCS).href;
+  try { await img.decode(); } catch {}
+  return { img, meta };
 }
 
 export async function initSprites() {
-  const prefix = (typeof location !== 'undefined' && location.pathname.includes('/docs/')) ? '' : 'docs/';
-  const worker = await loadAtlas(prefix + 'worker_sprites.json');
-  if (worker) {
-    FRAMES = { ...FRAMES, ...worker.meta.frames };
-    ANIMS = { ...ANIMS, ...worker.meta.animations };
-    globalThis.__SPRITE_IMG_WORKER__ = worker.img;
-    if (!globalThis.__SPRITE_IMG__) {
-      globalThis.__SPRITE_IMG__ = worker.img;
-    }
+  // baseline sprites already available; nothing to do here for now
+}
+
+export async function initWorkerAtlas() {
+  const a = await __loadAtlas('worker_sprites.json').catch(() => null);
+  if (!a) return;
+  Object.assign(FRAMES, a.meta.frames || {});
+  Object.assign(ANIMS, a.meta.animations || {});
+  globalThis.__SPRITE_IMG_WORKER__ = a.img;
+  if (!globalThis.__SPRITE_IMG__) {
+    globalThis.__SPRITE_IMG__ = a.img;
   }
 }
 
-export function nextFrame(anim, t) {
+export async function initMageAtlas() {
+  const a = await __loadAtlas('mage_sprites.json').catch(() => null);
+  if (!a) return;
+  Object.assign(FRAMES, a.meta.frames || {});
+  Object.assign(ANIMS, a.meta.animations || {});
+  globalThis.__SPRITE_IMG_MAGE__ = a.img;
+}
+
+export async function initTerrainAtlas() {
+  const a = await __loadAtlas('terrain_sprites.json').catch(() => null);
+  if (!a) return;
+  Object.assign(FRAMES, a.meta.frames || {});
+  Object.assign(ANIMS, a.meta.animations || {});
+  globalThis.__SPRITE_IMG_TERRAIN__ = a.img;
+}
+
+export function nextFrame(anim, t, fps = 10) {
   const seq = ANIMS[anim];
   if (!seq) return null;
-  const idx = Math.floor((t * 10) % seq.length);
+  const idx = Math.floor((t * fps) % seq.length);
   return seq[idx];
 }
 
@@ -456,7 +475,12 @@ export function drawSprite(ctx, name, x, y, opts = {}) {
       flipY = false,
       rotate = 0,
     } = opts;
-    const img = name.startsWith('worker_') ? globalThis.__SPRITE_IMG_WORKER__ : globalThis.__SPRITE_IMG__;
+    const img =
+      name.startsWith('worker_') ? globalThis.__SPRITE_IMG_WORKER__ :
+      name.startsWith('mage_')   ? globalThis.__SPRITE_IMG_MAGE__   :
+      (name.startsWith('tree_') || name.startsWith('grass_') || name.startsWith('water_') || name === 'dirt')
+        ? globalThis.__SPRITE_IMG_TERRAIN__
+        : globalThis.__SPRITE_IMG__;
     if (!img) return;
     ctx.save();
     ctx.imageSmoothingEnabled = false;
