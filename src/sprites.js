@@ -373,7 +373,11 @@ async function __loadAtlas(name) {
 }
 
 export async function initSprites() {
-  // baseline sprites already available; nothing to do here for now
+  await Promise.all([
+    initWorkerAtlas(),
+    initMageAtlas(),
+    initTerrainAtlas()
+  ]);
 }
 
 export async function initWorkerAtlas() {

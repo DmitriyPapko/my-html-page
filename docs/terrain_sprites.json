@@ -1,0 +1,15 @@
+{
+  "imageData": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABACAYAAADS1n9/AAABpElEQVR4nO3cPVLDMBRFYdnDDrIYCuqwo/Tus6TUFCwmazAFMgT8l/FYfpo552sokljM6OpJUSw3qU99ivQZ2npKr7HNX99Poe23oa0r3Ev0P1CLxzLYBLwexQoAZwDgnAKytbJc+vUoVgA4AwBnAOAMAJyLwMx9ACEZADingMx9ACEZADgDAGcA4FwEZu4DCMkAwDkFZO4DCMkAwBkAOAMA5yIwcx9ASAYAzikgcx9ASAYAbrUyXc+n0fMDLm/3+fd/jM+7X273hXb62OcTdKGtp9Q1obPD02uApU6fe99UGFSX1QA82/GLn71tvoQKW14DdDs9Pmav62h30xWgRIcN1+yq/UaENK4ApUer1aAqfg2E+xuAo0anVaAavwE4ulMMQRWcAuC+AxA1Gq0C4awAcAYArrUMs1kB4AwAnAGAMwBwBgDOAMC1/j7PZgWAMwBww49BMdOA0084KwDc4w0hx45GR38V/t8Sdkyn2PnVcAqAm7otvOzodPRXZe5gSJP/7nevgB1fpbWjYft0mp1frdXDocMJ3y2HRH8+m7YfMFVZXxGfSOLoNXkjAAAAAElFTkSuQmCC",
+  "frames": {
+    "grass_A":      { "frame": { "x": 0,  "y": 0,  "w": 32, "h": 32 }, "anchor": { "x": 16, "y": 16 } },
+    "grass_B":      { "frame": { "x": 32, "y": 0,  "w": 32, "h": 32 }, "anchor": { "x": 16, "y": 16 } },
+    "grass_flowers":{ "frame": { "x": 64, "y": 0,  "w": 32, "h": 32 }, "anchor": { "x": 16, "y": 16 } },
+    "dirt":         { "frame": { "x": 96, "y": 0,  "w": 32, "h": 32 }, "anchor": { "x": 16, "y": 16 } },
+    "tree_oak":     { "frame": { "x": 0,  "y": 32, "w": 32, "h": 32 }, "anchor": { "x": 16, "y": 32 } },
+    "water_0":      { "frame": { "x": 32, "y": 32, "w": 32, "h": 32 }, "anchor": { "x": 16, "y": 16 } },
+    "water_1":      { "frame": { "x": 64, "y": 32, "w": 32, "h": 32 }, "anchor": { "x": 16, "y": 16 } }
+  },
+  "animations": {
+    "water_loop": ["water_0", "water_1"]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "imageData": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAN0lEQVR4nO3OsQ0AIAhFQXT/nXECYwEJhXc14b8I4HfrfZLZMHPd2fXnNQIECBAgQICA8QBg3AEAFwIiEweGWQAAAABJRU5ErkJggg==",
+  "frames": {
+    "mage_idle_0":   { "frame": { "x": 0, "y": 0, "w": 32, "h": 32 }, "anchor": { "x": 16, "y": 24 } },
+    "mage_walk_0":   { "frame": { "x": 0, "y": 0, "w": 32, "h": 32 }, "anchor": { "x": 16, "y": 24 } },
+    "mage_cast_0":   { "frame": { "x": 0, "y": 0, "w": 32, "h": 32 }, "anchor": { "x": 16, "y": 24 } },
+    "mage_attack_0": { "frame": { "x": 0, "y": 0, "w": 32, "h": 32 }, "anchor": { "x": 16, "y": 24 } },
+    "mage_death_0":  { "frame": { "x": 0, "y": 0, "w": 32, "h": 32 }, "anchor": { "x": 16, "y": 24 } }
+  },
+  "animations": {
+    "mage_idle":   ["mage_idle_0"],
+    "mage_walk":   ["mage_walk_0"],
+    "mage_cast":   ["mage_cast_0"],
+    "mage_attack": ["mage_attack_0"],
+    "mage_death":  ["mage_death_0"]
+  }
+}

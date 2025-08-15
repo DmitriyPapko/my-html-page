@@ -1,4 +1,4 @@
-import { drawSprite, nextFrame, initSprites, initWorkerAtlas, initMageAtlas, initTerrainAtlas } from "./sprites.js";
+import { drawSprite, nextFrame, initSprites } from "./sprites.js";
 import { Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, getById, enemiesFor, allUnits, allStructures, nearestNode, lootFromTier } from "./entities.js";
 import state from './state.js';
 import { AIController } from './ai.js';
@@ -16,9 +16,6 @@ const mini = document.getElementById('minimap'), mctx = mini.getContext('2d'); m
 globalThis.drawSprite = (name, x, y, scale = 1, override = {}) => drawSprite(ctx, name, x, y, { scale, override });
 globalThis.nextFrame = nextFrame;
 await initSprites();
-await initWorkerAtlas();
-await initMageAtlas();
-await initTerrainAtlas();
 const DPR = Math.max(1, window.devicePixelRatio || 1);
 mini.width = Math.floor(mini.clientWidth * DPR);
 mini.height = Math.floor(mini.clientHeight * DPR);
