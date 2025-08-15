@@ -1,9 +1,12 @@
+import { dist2 } from '../utils.js';
+
 export class FireAuraEffect {
-  constructor({ radius, dpsPerTick, tickMs, durationMs }) {
+  constructor({ radius, dpsPerTick, tickMs, durationMs, enemiesFor }) {
     this.radius = radius;
     this.dpsPerTick = dpsPerTick;
     this.tickMs = tickMs;
     this.durationMs = durationMs;
+    this.enemiesFor = enemiesFor;
     this.elapsed = 0;
     this.tickTimer = 0;
     this.done = false;
@@ -14,11 +17,11 @@ export class FireAuraEffect {
     this.tickTimer += dt * 1000;
     if (this.tickTimer >= this.tickMs) {
       this.tickTimer -= this.tickMs;
-      const enemies = globalThis.enemiesFor(host.owner) || [];
+      const enemies = this.enemiesFor ? this.enemiesFor(host.owner) : [];
       const r2 = this.radius * this.radius;
       for (const e of enemies) {
         if (e.dead) continue;
-        if (globalThis.dist2(host.x, host.y, e.x, e.y) <= r2) {
+        if (dist2(host.x, host.y, e.x, e.y) <= r2) {
           e.damage(this.dpsPerTick, host.owner);
         }
       }
@@ -27,9 +30,9 @@ export class FireAuraEffect {
       this.done = true;
     }
   }
-  draw(ctx, host) {
-    const s = globalThis.worldToScreen(host.x, host.y);
-    const zoom = globalThis.world.zoom;
+  draw(ctx, host, worldToScreen, world) {
+    const s = worldToScreen(host.x, host.y);
+    const zoom = world.zoom;
     const pulse = this.radius + Math.sin(Date.now() * 0.005) * 5;
     ctx.save();
     ctx.strokeStyle = 'rgba(255,80,0,0.35)';
@@ -41,4 +44,4 @@ export class FireAuraEffect {
   }
 }
 
-Object.assign(globalThis, { FireAuraEffect });
+export default FireAuraEffect;

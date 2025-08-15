@@ -15,13 +15,12 @@ export class Sequence {
     this.children = children;
   }
   tick(ctx) {
-    let all = true;
     for (const child of this.children) {
       if (child.tick(ctx) === false) {
-        all = false;
+        return false;
       }
     }
-    return all;
+    return true;
   }
 }
 
@@ -34,5 +33,4 @@ export class Action {
   }
 }
 
-// Expose for browser without bundler
-Object.assign(globalThis, { Selector, Sequence, Action });
+export default { Selector, Sequence, Action };

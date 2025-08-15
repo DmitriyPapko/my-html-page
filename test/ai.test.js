@@ -1,8 +1,21 @@
 import assert from 'assert';
 import { AIController, nearestNeutralCamp } from '../src/ai.js';
 import { packPower, campPower } from '../src/config/ai.js';
+import { Sequence, Action } from '../src/ai/behavior.js';
 
 const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
+
+// Sequence should stop after first failure
+(() => {
+  let calls = 0;
+  const seq = new Sequence([
+    new Action(() => { calls++; return false; }),
+    new Action(() => { calls++; return true; })
+  ]);
+  const result = seq.tick({});
+  assert.strictEqual(result, false);
+  assert.strictEqual(calls, 1);
+})();
 
 // ensureHQ returns false without resources then succeeds
 (() => {
@@ -394,7 +407,7 @@ const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
   assert.ok(ai.player.aiPlan.aggression < base);
 })();
 
-// think continues executing after earlier failures
+// think stops after first failure
 (() => {
   const worker1 = { id: 1, type: 'worker', state: 'idle' };
   const worker2 = { id: 2, type: 'worker', state: 'idle' };
@@ -427,12 +440,9 @@ const dist2 = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2;
   ai.player.aiPlan.open = ['well'];
   ai.player.aiPlan.minReserve = { rice: 0, water: 0 };
   ai.think(1);
-  assert.strictEqual(barr.queue[0], 'soldier');
-  const roles = [worker1.role, worker2.role].sort();
-  assert.deepStrictEqual(roles, ['rice', 'water']);
+  assert.strictEqual(barr.queue[0], undefined);
   const builders = [worker1, worker2].filter(w => w.state === 'build');
-  assert.strictEqual(builders.length, 1);
-  assert.strictEqual(builders[0].buildTargetId, ghost.id);
+  assert.strictEqual(builders.length, 0);
 })();
 
 console.log('All tests passed.');
