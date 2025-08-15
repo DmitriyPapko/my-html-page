@@ -514,6 +514,14 @@ export function pickSpriteImage(name) {
   if (typeof name !== 'string') return globalThis.__SPRITE_IMG__;
   if (name.startsWith('paladin_')) return globalThis.__SPRITE_IMG_PALADIN__;
   if (name.startsWith('rogue_')) return globalThis.__SPRITE_IMG_ROGUE__;
+  if (name.startsWith('soldier_')) return globalThis.__SPRITE_IMG_SOLDIER__;
+  if (name.startsWith('archer_')) return globalThis.__SPRITE_IMG_ARCHER__;
+  if (name.startsWith('demon_')) return globalThis.__SPRITE_IMG_DEMON__;
+  if (name.startsWith('elemental_')) return globalThis.__SPRITE_IMG_ELEMENTAL__;
+  if (name.startsWith('forest_troll_')) return globalThis.__SPRITE_IMG_FOREST_TROLL__;
+  if (name.startsWith('gnome_seeker_')) return globalThis.__SPRITE_IMG_GNOME_SEEKER__;
+  if (name.startsWith('hermit_mage_')) return globalThis.__SPRITE_IMG_HERMIT_MAGE__;
+  if (name.startsWith('wild_beast_')) return globalThis.__SPRITE_IMG_WILD_BEAST__;
   if (name.startsWith('mage_')) return globalThis.__SPRITE_IMG_MAGE__;
   if (name.startsWith('worker_')) return globalThis.__SPRITE_IMG_WORKER__;
   if (name.startsWith('soldier_')) return globalThis.__SPRITE_IMG_SOLDIER__;
