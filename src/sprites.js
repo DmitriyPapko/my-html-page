@@ -412,6 +412,14 @@ export async function initTerrainAtlas() {
   globalThis.__SPRITE_IMG_TERRAIN__ = a.img;
 }
 
+export async function initPaladinAtlas() {
+  const a = await __loadAtlas('paladin_sprites.json').catch(() => null);
+  if (!a) return;
+  Object.assign(FRAMES, a.meta.frames || {});
+  Object.assign(ANIMS, a.meta.animations || {});
+  globalThis.__SPRITE_IMG_PALADIN__ = a.img;
+}
+
 export function nextFrame(anim, t, fps = 10) {
   const seq = ANIMS[anim];
   if (!seq) return null;
@@ -425,8 +433,9 @@ export function pickSpriteImage(name) {
   // frame lookup fails. In that case fall back to the default sprite atlas so
   // that callers can safely skip rendering without throwing.
   if (typeof name !== 'string') return globalThis.__SPRITE_IMG__;
-  if (name.startsWith('worker_')) return globalThis.__SPRITE_IMG_WORKER__;
+  if (name.startsWith('paladin_')) return globalThis.__SPRITE_IMG_PALADIN__;
   if (name.startsWith('mage_')) return globalThis.__SPRITE_IMG_MAGE__;
+  if (name.startsWith('worker_')) return globalThis.__SPRITE_IMG_WORKER__;
   if (
     name.startsWith('grass_') ||
     name.startsWith('water_') ||
@@ -552,9 +561,10 @@ export function drawSprite(ctx, name, x, y, opts = {}) {
       rotate = 0,
     } = opts;
     const img =
-      name.startsWith('worker_') ? globalThis.__SPRITE_IMG_WORKER__ :
-      name.startsWith('mage_')   ? globalThis.__SPRITE_IMG_MAGE__   :
-      (name.startsWith('tree_') || name.startsWith('grass_') || name.startsWith('water_') || name === 'dirt')
+      name.startsWith('paladin_') ? globalThis.__SPRITE_IMG_PALADIN__ :
+      name.startsWith('mage_')    ? globalThis.__SPRITE_IMG_MAGE__    :
+      name.startsWith('worker_')  ? globalThis.__SPRITE_IMG_WORKER__  :
+      (name.startsWith('grass_') || name.startsWith('water_') || name === 'dirt' || name.startsWith('tree_'))
         ? globalThis.__SPRITE_IMG_TERRAIN__
         : globalThis.__SPRITE_IMG__;
     if (!img) return;
