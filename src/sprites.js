@@ -370,13 +370,20 @@ const __DOCS = new URL(
 async function __loadAtlas(name) {
   const u1 = new URL(name, __DOCS).href;
   let res = await fetch(u1).catch(() => null);
-  if (!res || !res.ok) res = await fetch(name).catch(() => null);
+  // When running from a server that already points to `docs/` as the root
+  // (e.g. during local development), the above URL will 404. In that case
+  // try resolving the atlas relative to the current page instead.
+  if ((!res || !res.ok) && typeof location !== 'undefined') {
+    const u2 = new URL(name, location.href).href;
+    res = await fetch(u2).catch(() => null);
+  }
   if (!res || !res.ok) throw new Error('Failed to load ' + name);
   const meta = await res.json();
   const img = new Image();
   img.decoding = 'async';
   const imagePath = (meta.image || name.replace('.json', '.png')).replace(/^docs\//, '');
-  img.src = meta.imageData || new URL(imagePath, __DOCS).href;
+  const base = new URL('.', res.url);
+  img.src = meta.imageData || new URL(imagePath, base).href;
   try { await img.decode(); } catch {}
   return { img, meta };
 }
