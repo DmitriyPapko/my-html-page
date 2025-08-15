@@ -421,6 +421,10 @@ export function nextFrame(anim, t, fps = 10) {
 
 // выбрать правильный атлас по имени кадра
 export function pickSpriteImage(name) {
+  // Guard against undefined sprite names which can occur when an animation
+  // frame lookup fails. In that case fall back to the default sprite atlas so
+  // that callers can safely skip rendering without throwing.
+  if (typeof name !== 'string') return globalThis.__SPRITE_IMG__;
   if (name.startsWith('worker_')) return globalThis.__SPRITE_IMG_WORKER__;
   if (name.startsWith('mage_')) return globalThis.__SPRITE_IMG_MAGE__;
   if (
@@ -448,9 +452,15 @@ export function drawTile(
   zoom,
   ctx = globalThis.ctx
 ) {
+  // Skip drawing if no sprite name was provided. This can happen when an
+  // animation lookup fails and returns `null`.
+  if (typeof name !== 'string') return;
+
   const F = globalThis.FRAMES?.[name];
+  if (!F) return;
+
   const IMG = pickSpriteImage(name);
-  if (!F || !IMG) return;
+  if (!IMG) return;
 
   // мировые координаты верхнего-левого угла клетки:
   const wx = tileX * ts;
