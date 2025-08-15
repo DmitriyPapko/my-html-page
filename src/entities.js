@@ -310,66 +310,6 @@ export class Unit extends Entity {
       else if (this.state === 'fight') animName = 'worker_attack';
       const frame = globalThis.nextFrame(animName, globalThis.simTime || 0) || 'worker_idle_0';
       globalThis.drawSprite(frame, s.x, s.y, zoom);
-    } else if (globalThis.nextFrame && globalThis.drawSprite && globalThis.FRAMES) {
-      let prefix = null;
-      if (['soldier', 'archer', 'mage', 'demon', 'elemental'].includes(this.type)) {
-        prefix = this.type;
-      }
-      if (prefix) {
-        let anim = `${prefix}_idle`;
-        if (this.dead) anim = `${prefix}_death`;
-        else if (this.state === 'cast') anim = `${prefix}_cast`;
-        else if (this.state === 'fight') anim = `${prefix}_attack`;
-        else if (this.state === 'move') anim = `${prefix}_walk`;
-        const frame = globalThis.nextFrame(anim, globalThis.simTime || 0) || `${prefix}_idle_0`;
-        globalThis.drawSprite(frame, s.x, s.y, zoom);
-      } else {
-        ctx.save();
-        ctx.translate(s.x, s.y);
-        ctx.scale(zoom, zoom);
-        const grad = ctx.createLinearGradient(0, -12, 0, 12);
-        grad.addColorStop(0, '#f0f0f0');
-        grad.addColorStop(1, '#bdbdbd');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(0, -8, 8, Math.PI, 0);
-        ctx.lineTo(8, 8);
-        ctx.arc(0, 8, 8, 0, Math.PI);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = col;
-        ctx.fillRect(-8, -2, 16, 4);
-        if (this.type === 'worker') {
-          ctx.strokeStyle = '#ccc';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(10, -6);
-          ctx.lineTo(14, -10);
-          ctx.moveTo(10, -6);
-          ctx.lineTo(14, -2);
-          ctx.stroke();
-        } else if (this.type === 'soldier') {
-          ctx.fillStyle = '#ccc';
-          ctx.beginPath();
-          ctx.moveTo(-12, -4);
-          ctx.lineTo(-8, 0);
-          ctx.lineTo(-12, 4);
-          ctx.closePath();
-          ctx.fill();
-        } else if (this.type === 'archer') {
-          ctx.strokeStyle = '#da8';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc(12, 0, 6, -Math.PI / 2, Math.PI / 2);
-          ctx.stroke();
-        } else if (this.type === 'mage') {
-          ctx.fillStyle = '#8ad';
-          ctx.beginPath();
-          ctx.arc(0, -14, 4, 0, 6.283);
-          ctx.fill();
-        }
-        ctx.restore();
-      }
     } else {
       ctx.save();
       ctx.translate(s.x, s.y);
@@ -688,7 +628,6 @@ export class NeutralCreep extends Entity {
     this.awarded = false;
     this.regen = 0.2;
     this.baseSpeed = 80;
-    this.attackTimer = 0;
   }
   damage(n, killerOwner = null) {
     if (this.kind === 'gnome' && Math.random() < 0.25) n *= 0.5;
@@ -714,7 +653,6 @@ export class NeutralCreep extends Entity {
         this.attackCd -= dt;
         if (this.attackCd <= 0) {
           this.attackCd = .65;
-          this.attackTimer = 0.4;
           tgt.damage(this.dps, -1);
         }
       }
@@ -725,75 +663,62 @@ export class NeutralCreep extends Entity {
       }
       this.aggro = false;
     }
-    if (this.attackTimer > 0) this.attackTimer = Math.max(0, this.attackTimer - dt);
   }
   draw() {
     if (!globalThis.isVisible(this.x, this.y)) return;
     const s = globalThis.worldToScreen(this.x, this.y);
     const ctx = globalThis.ctx;
     const zoom = globalThis.world.zoom;
+    let band = '#9fb2a1';
+    if (this.kind === 'mage') band = '#8ad';
+    else if (this.kind === 'gnome') band = '#b86';
+    else if (this.kind === 'troll') band = '#a44';
     globalThis.drawShadow(s.x, s.y + 12 * zoom, 12 * zoom);
-    if (globalThis.nextFrame && globalThis.drawSprite && globalThis.FRAMES) {
-      let prefix = 'wild_beast';
-      if (this.kind === 'mage') prefix = 'hermit_mage';
-      else if (this.kind === 'gnome') prefix = 'gnome_seeker';
-      else if (this.kind === 'troll') prefix = 'forest_troll';
-      let anim = `${prefix}_idle`;
-      if (this.dead) anim = `${prefix}_death`;
-      else if (this.attackTimer > 0) anim = `${prefix}_attack`;
-      else if (this.aggro) anim = `${prefix}_walk`;
-      const frame = globalThis.nextFrame(anim, globalThis.simTime || 0) || `${prefix}_idle_0`;
-      globalThis.drawSprite(frame, s.x, s.y, zoom);
-    } else {
-      let band = '#9fb2a1';
-      if (this.kind === 'mage') band = '#8ad';
-      else if (this.kind === 'gnome') band = '#b86';
-      else if (this.kind === 'troll') band = '#a44';
-      ctx.save();
-      ctx.translate(s.x, s.y);
-      ctx.scale(zoom, zoom);
-      const grad = ctx.createLinearGradient(0, -12, 0, 12);
-      grad.addColorStop(0, '#f0f0f0');
-      grad.addColorStop(1, '#bdbdbd');
-      ctx.fillStyle = grad;
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.scale(zoom, zoom);
+    const grad = ctx.createLinearGradient(0, -12, 0, 12);
+    grad.addColorStop(0, '#f0f0f0');
+    grad.addColorStop(1, '#bdbdbd');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, -8, 8, Math.PI, 0);
+    ctx.lineTo(8, 8);
+    ctx.arc(0, 8, 8, 0, Math.PI);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = band;
+    ctx.fillRect(-8, -2, 16, 4);
+    // small icons by type
+    if (this.kind === 'mage') {
+      ctx.fillStyle = '#8ad';
       ctx.beginPath();
-      ctx.arc(0, -8, 8, Math.PI, 0);
-      ctx.lineTo(8, 8);
-      ctx.arc(0, 8, 8, 0, Math.PI);
+      ctx.arc(0, -14, 4, 0, 6.283);
+      ctx.fill();
+    } else if (this.kind === 'gnome') {
+      ctx.fillStyle = '#b86';
+      ctx.fillRect(-10, -12, 8, 4);
+    } else if (this.kind === 'troll') {
+      ctx.fillStyle = '#a44';
+      ctx.beginPath();
+      ctx.moveTo(-8, -12);
+      ctx.lineTo(-2, -16);
+      ctx.lineTo(2, -12);
+      ctx.lineTo(8, -16);
+      ctx.lineTo(8, -12);
       ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = band;
-      ctx.fillRect(-8, -2, 16, 4);
-      if (this.kind === 'mage') {
-        ctx.fillStyle = '#8ad';
-        ctx.beginPath();
-        ctx.arc(0, -14, 4, 0, 6.283);
-        ctx.fill();
-      } else if (this.kind === 'gnome') {
-        ctx.fillStyle = '#b86';
-        ctx.fillRect(-10, -12, 8, 4);
-      } else if (this.kind === 'troll') {
-        ctx.fillStyle = '#a44';
-        ctx.beginPath();
-        ctx.moveTo(-8, -12);
-        ctx.lineTo(-2, -16);
-        ctx.lineTo(2, -12);
-        ctx.lineTo(8, -16);
-        ctx.lineTo(8, -12);
-        ctx.closePath();
-        ctx.fill();
-      } else {
-        ctx.fillStyle = '#9fb2a1';
-        ctx.beginPath();
-        ctx.moveTo(-10, -12);
-        ctx.lineTo(-6, -16);
-        ctx.lineTo(-2, -12);
-        ctx.lineTo(2, -16);
-        ctx.lineTo(6, -12);
-        ctx.fill();
-      }
-      ctx.restore();
+    } else {
+      ctx.fillStyle = '#9fb2a1';
+      ctx.beginPath();
+      ctx.moveTo(-10, -12);
+      ctx.lineTo(-6, -16);
+      ctx.lineTo(-2, -12);
+      ctx.lineTo(2, -16);
+      ctx.lineTo(6, -12);
+      ctx.fill();
     }
+    ctx.restore();
     globalThis.drawHp(s.x, s.y - 18 * zoom, this.hp / this.maxHp);
   }
 }
