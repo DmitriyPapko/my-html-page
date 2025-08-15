@@ -361,7 +361,9 @@ async function loadAtlas(jsonUrl) {
   try {
     const meta = await fetch(jsonUrl).then(r => r.json());
     const img = new Image(); img.decoding = 'async';
-    img.src = meta.imageData || meta.image || jsonUrl.replace('.json', '.png');
+    const base = new URL(jsonUrl, typeof location !== 'undefined' ? location.href : 'https://example.com/');
+    const src = meta.imageData || meta.image || jsonUrl.replace('.json', '.png');
+    img.src = meta.imageData ? src : new URL(src, base).toString();
     await img.decode();
     return { img, meta };
   } catch (e) {
@@ -370,13 +372,14 @@ async function loadAtlas(jsonUrl) {
 }
 
 export async function initSprites() {
-  const base = await loadAtlas('docs/sprites.json');
+  const prefix = (typeof location !== 'undefined' && location.pathname.includes('/docs/')) ? '' : 'docs/';
+  const base = await loadAtlas(prefix + 'sprites.json');
   if (base) {
     FRAMES = { ...FRAMES, ...base.meta.frames };
     ANIMS = { ...ANIMS, ...(base.meta.animations || {}) };
     globalThis.__SPRITE_IMG__ = base.img;
   }
-  const worker = await loadAtlas('docs/worker_sprites.json');
+  const worker = await loadAtlas(prefix + 'worker_sprites.json');
   if (worker) {
     FRAMES = { ...FRAMES, ...worker.meta.frames };
     ANIMS = { ...ANIMS, ...worker.meta.animations };
