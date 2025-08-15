@@ -1,4 +1,21 @@
-import { drawSprite, nextFrame, initSprites, initWorkerAtlas, initMageAtlas, initTerrainAtlas, initPaladinAtlas, initRogueAtlas } from "./sprites.js";
+import {
+  drawSprite,
+  nextFrame,
+  initSprites,
+  initWorkerAtlas,
+  initMageAtlas,
+  initTerrainAtlas,
+  initPaladinAtlas,
+  initRogueAtlas,
+  initSoldierAtlas,
+  initArcherAtlas,
+  initDemonAtlas,
+  initElementalAtlas,
+  initForestTrollAtlas,
+  initGnomeSeekerAtlas,
+  initHermitMageAtlas,
+  initWildBeastAtlas
+} from "./sprites.js";
 import { Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, getById, enemiesFor, allUnits, allStructures, nearestNode, lootFromTier } from "./entities.js";
 import state from './state.js';
 import { AIController } from './ai.js';
