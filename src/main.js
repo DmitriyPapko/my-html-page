@@ -1,4 +1,4 @@
-import { drawSprite, initSprites } from "./sprites.js";
+import { drawSprite, initSprites, nextFrame } from "./sprites.js";
 import { Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, getById, enemiesFor, allUnits, allStructures, nearestNode, lootFromTier } from "./entities.js";
 import state from './state.js';
 import { AIController } from './ai.js';
@@ -14,6 +14,7 @@ const dist2 = (x1, y1, x2, y2) => { const dx = x2 - x1, dy = y2 - y1; return dx 
 const cvs = document.getElementById('game'), ctx = cvs.getContext('2d'); ctx.imageSmoothingEnabled = false;
 const mini = document.getElementById('minimap'), mctx = mini.getContext('2d'); mctx.imageSmoothingEnabled = false;
 globalThis.drawSprite = (name, x, y, scale = 1, override = {}) => drawSprite(ctx, name, x, y, { scale, override });
+globalThis.nextFrame = nextFrame;
 initSprites();
 const DPR = Math.max(1, window.devicePixelRatio || 1);
 mini.width = Math.floor(mini.clientWidth * DPR);
