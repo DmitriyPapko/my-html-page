@@ -1,5 +1,5 @@
 {
-  "image": "docs/worker_sprites.png",
+  "image": "worker_sprites.png",
   "tile": {
     "w": 32,
     "h": 32
