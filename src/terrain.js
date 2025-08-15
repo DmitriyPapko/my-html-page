@@ -63,11 +63,11 @@ const HEIGHT_IN_TILES = Math.ceil(globalThis.world.height / TS);
 const terrain = generateTerrain(WIDTH_IN_TILES, HEIGHT_IN_TILES, {
   seed: Date.now() % 1e9,
   maxLakes: 3,
-  lakeMinDist: 22,
+  lakeMinDist: 24,
   lakeRadius: [10, 18],
-  minLakeSize: 60,
+  minLakeSize: 70,
   waterCoverageMax: 0.10,
-  flowerRate: 0.012,
+  flowerRate: 0.010,
   flowerMinDist: 2
 });
 const tileAt = (i, j) => terrain[j]?.[i] ?? { kind: 'grass_A' };
