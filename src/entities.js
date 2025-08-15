@@ -674,30 +674,30 @@ export class NeutralCreep extends Entity {
 
 export function getById(id) {
   if (!id) return null;
-  for (const p of globalThis.players) {
+  for (const p of state.players) {
     for (const u of p.units) { if (u.id === id) return u; }
     for (const s of p.structures) { if (s.id === id) return s; }
   }
-  for (const n of globalThis.neutral.units) { if (n.id === id) return n; }
+  for (const n of state.neutral.units) { if (n.id === id) return n; }
   return null;
 }
 
 export function enemiesFor(owner) {
   const arr = [];
-  for (const p of globalThis.players) {
-    if (p === globalThis.players[owner]) continue;
+  for (const p of state.players) {
+    if (p === state.players[owner]) continue;
     arr.push(...p.units.filter(u => !u.dead), ...p.structures.filter(s => !s.isGhost));
   }
-  arr.push(...globalThis.neutral.units);
+  arr.push(...state.neutral.units);
   return arr;
 }
 
 export function allUnits() {
-  return globalThis.players[0].units.concat(globalThis.players[1].units, globalThis.players[2].units);
+  return state.players[0].units.concat(state.players[1].units, state.players[2].units);
 }
 
 export function allStructures() {
-  return globalThis.players[0].structures.concat(globalThis.players[1].structures, globalThis.players[2].structures);
+  return state.players[0].structures.concat(state.players[1].structures, state.players[2].structures);
 }
 
 export function nearestNode(type, P) {

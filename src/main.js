@@ -1,6 +1,7 @@
 import { drawSprite } from "./sprites.js";
 import { Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, getById, enemiesFor, allUnits, allStructures, nearestNode, lootFromTier } from "./entities.js";
 import state from './state.js';
+import { AIController } from './ai.js';
 import { FireAuraEffect } from "./effects/FireAuraEffect.js";
 
 /* ==== Helpers ==== */
@@ -95,6 +96,7 @@ function drawWeather(dt) {
   }
 }
       const neutral = { units: [] }, drops = [], projectiles = [];
+      state.neutral = neutral;
 
       /* ==== Players & economy ==== */
       const players = [
