@@ -359,15 +359,24 @@ let FRAMES = {}, ANIMS = {};
 globalThis.FRAMES = FRAMES;
 globalThis.ANIMS = ANIMS;
 
-const __DOCS = new URL('../docs/', import.meta.url);
+// Base path for sprite atlases lives under the docs folder when running from
+// the repository root, but on GitHub Pages the modules themselves are served
+// from the `docs/src` directory. Resolve the proper docs path in both cases.
+const __DOCS = new URL(
+  import.meta.url.includes('/docs/') ? '../' : '../docs/',
+  import.meta.url
+);
+
 async function __loadAtlas(name) {
   const u1 = new URL(name, __DOCS).href;
   let res = await fetch(u1).catch(() => null);
   if (!res || !res.ok) res = await fetch(name).catch(() => null);
   if (!res || !res.ok) throw new Error('Failed to load ' + name);
   const meta = await res.json();
-  const img = new Image(); img.decoding = 'async';
-  img.src = meta.imageData || new URL(meta.image || name.replace('.json', '.png'), __DOCS).href;
+  const img = new Image();
+  img.decoding = 'async';
+  const imagePath = (meta.image || name.replace('.json', '.png')).replace(/^docs\//, '');
+  img.src = meta.imageData || new URL(imagePath, __DOCS).href;
   try { await img.decode(); } catch {}
   return { img, meta };
 }
