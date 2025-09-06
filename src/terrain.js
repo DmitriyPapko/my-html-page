@@ -1,5 +1,5 @@
 import { drawSprite, SPRITES, drawTile } from './sprites.js';
-import { WATER, RICE } from './config/visual.js';
+import { WATER } from './config/visual.js';
 import { generateTerrain } from './terrainGen.js';
 
 /* ==== Terrain generation and blockers ==== */

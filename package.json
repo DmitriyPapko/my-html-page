@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "description": "A simple static HTML page project.",
   "type": "module",
-  "main": "index.js",
   "scripts": {
-    "test": "node test/ai.test.js && node test/mp-regen.test.js && node test/hero-abilities.test.js && node test/effects.test.js"
+    "start": "http-server .",
+    "test": "node --test test",
+    "lint": "eslint src test"
   },
   "repository": {
     "type": "git",
@@ -17,5 +18,10 @@
   "bugs": {
     "url": "https://github.com/DmitriyPapko/my-html-page/issues"
   },
-  "homepage": "https://github.com/DmitriyPapko/my-html-page#readme"
+  "homepage": "https://github.com/DmitriyPapko/my-html-page#readme",
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "http-server": "^14.1.1",
+    "jsdom": "^24.0.0"
+  }
 }

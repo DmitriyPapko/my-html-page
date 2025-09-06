@@ -1,5 +1,5 @@
 /* ==== AI Controller ==== */
-import { Selector, Sequence, Action } from './ai/behavior.js';
+import { Sequence, Action } from './ai/behavior.js';
 import { DEBUG_AI, packPower, campPower, AI_THRESHOLDS } from './config/ai.js';
 
 const DIFFICULTY_CONFIG = {
