@@ -384,7 +384,7 @@ async function __loadAtlas(name) {
   const imagePath = (meta.image || name.replace('.json', '.png')).replace(/^docs\//, '');
   const base = new URL('.', res.url);
   img.src = meta.imageData || new URL(imagePath, base).href;
-  try { await img.decode(); } catch {}
+  try { await img.decode(); } catch { /* ignore */ }
   return { img, meta };
 }
 

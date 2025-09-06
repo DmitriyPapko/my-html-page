@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { AIController, nearestNeutralCamp } from '../src/ai.js';
+import { AIController } from '../src/ai.js';
 import { packPower, campPower } from '../src/config/ai.js';
 import { Sequence, Action } from '../src/ai/behavior.js';
 
