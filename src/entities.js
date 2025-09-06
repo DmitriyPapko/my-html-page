@@ -129,6 +129,11 @@ export class Unit extends Entity {
       this.destX = node.x + this.deps.rand(-24, 24);
       this.destY = node.y + this.deps.rand(-24, 24);
     }
+    this.harvestResource(dt, node, HQ, P, this.role);
+  }
+  harvestResource(dt, node, HQ, P, type) {
+    const gatherTime = type === 'rice' ? 2.2 : 2.6;
+    const amount = type === 'rice' ? 12 : 9;
     if (this.state === 'to_node') {
       const dx = this.destX - this.x, dy = this.destY - this.y, d = Math.hypot(dx, dy);
       if (d > 2) {
@@ -136,27 +141,24 @@ export class Unit extends Entity {
         moveEntity(this, dx, dy, v, dt, this.deps.isBlocked);
       } else {
         this.state = 'harvest';
-        this.workTimer = (this.role === 'rice' ? 2.2 : 2.6);
+        this.workTimer = gatherTime;
       }
-    }
-    if (this.state === 'harvest') {
+    } else if (this.state === 'harvest') {
       this.workTimer -= dt;
       if (this.workTimer <= 0) {
-        this.carry = (this.role === 'rice' ? 12 : 9);
+        this.carry = amount;
         this.state = 'to_hq';
         this.destX = HQ.x + this.deps.rand(-32, 32);
         this.destY = HQ.y + this.deps.rand(-32, 32);
       }
-    }
-    if (this.state === 'to_hq') {
+    } else if (this.state === 'to_hq') {
       const dx = this.destX - this.x, dy = this.destY - this.y, d = Math.hypot(dx, dy);
       if (d > 2) {
         const v = this.getCurrentSpeed();
         moveEntity(this, dx, dy, v, dt, this.deps.isBlocked);
       } else {
         if (this.carry > 0) {
-          if (this.role === 'rice') P.res.rice += this.carry;
-          else P.res.water += this.carry;
+          P.res[type] += this.carry;
           if (this.owner === 0) globalThis.updateRes();
           this.carry = 0;
         }
@@ -192,7 +194,7 @@ export class Unit extends Entity {
         } else {
           target.damage(this.dps, this.owner);
         }
-        if (!globalThis.muted) globalThis.beep(220 + this.dps, 0.05, 'square', 0.03);
+        if (!state.muted) globalThis.beep(220 + this.dps, 0.05, 'square', 0.03);
       }
     }
   }
@@ -231,7 +233,7 @@ export class Unit extends Entity {
       else {
         const dx = target.x - this.x, dy = target.y - this.y, d = Math.hypot(dx, dy);
         if (d > 40) { const v = this.getCurrentSpeed(); moveEntity(this, dx, dy, v, dt, this.deps.isBlocked); }
-        else { target.hp += 30 * dt; if (target.hp >= target.maxHp) { target.isGhost = false; target.hp = 520; target.maxHp = 520; this.state = 'idle'; this.buildTargetId = null; if (typeof globalThis.beep === 'function' && !globalThis.muted) globalThis.beep(300, 0.08, 'triangle', 0.05); } }
+        else { target.hp += 30 * dt; if (target.hp >= target.maxHp) { target.isGhost = false; target.hp = 520; target.maxHp = 520; this.state = 'idle'; this.buildTargetId = null; if (typeof globalThis.beep === 'function' && !state.muted) globalThis.beep(300, 0.08, 'triangle', 0.05); } }
       }
       return;
     }
@@ -259,7 +261,7 @@ export class Unit extends Entity {
     const s = globalThis.worldToScreen(this.x, this.y);
     const zoom = globalThis.world.zoom;
     const ctx = globalThis.ctx;
-    const col = globalThis.players[this.owner]?.color || '#9fb2a1';
+    const col = state.players[this.owner]?.color || '#9fb2a1';
     globalThis.drawShadow(s.x, s.y + 12 * zoom, 12 * zoom);
     if (this.isHero && globalThis.nextFrame && globalThis.drawSprite && globalThis.FRAMES) {
       if (this.heroClass === 'paladin') {
@@ -474,8 +476,8 @@ export class Structure extends Entity {
       if (this.qTime <= 0) {
         const u = this.queue.shift();
         if (u === 'hero') {
-          if (!globalThis.players[this.owner].hero || globalThis.players[this.owner].hero.dead) {
-            globalThis.spawnHero(this.owner, this.x + 40, this.y - 20, globalThis.players[this.owner].chosenClass);
+          if (!state.players[this.owner].hero || state.players[this.owner].hero.dead) {
+            globalThis.spawnHero(this.owner, this.x + 40, this.y - 20, state.players[this.owner].chosenClass);
           }
           this.qTime = 0;
         } else {
@@ -492,7 +494,7 @@ export class Structure extends Entity {
   draw() {
     if (this.owner !== 0 && !globalThis.isVisible(this.x, this.y)) return;
     const s = globalThis.worldToScreen(this.x, this.y);
-    const col = globalThis.players[this.owner]?.color || '#9fb2a1';
+    const col = state.players[this.owner]?.color || '#9fb2a1';
     const scale = globalThis.world.zoom * 5.25;
     const w = 16 * scale;
     globalThis.drawShadow(s.x, s.y + w / 2, w / 2);
@@ -696,7 +698,7 @@ export class NeutralCreep extends Entity {
   update(dt) {
     if (this.dead) return;
     let tgt = null, bd = 1e9;
-    const candidates = globalThis.players[0].units.concat(globalThis.players[1].units, globalThis.players[2].units);
+    const candidates = state.players[0].units.concat(state.players[1].units, state.players[2].units);
     for (const u of candidates) {
       if (u.dead) continue;
       const d = globalThis.dist2(this.x, this.y, u.x, u.y);

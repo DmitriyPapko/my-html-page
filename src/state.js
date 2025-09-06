@@ -9,10 +9,3 @@ export const state = {
 };
 
 export default state;
-
-['paused', 'muted', 'fogEnabled', 'players', 'neutral', 'isBlocked', 'rand'].forEach(key => {
-  Object.defineProperty(globalThis, key, {
-    get: () => state[key],
-    set: v => { state[key] = v; },
-  });
-});

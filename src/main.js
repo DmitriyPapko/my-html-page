@@ -23,13 +23,15 @@ import FireAuraEffect from "./effects/FireAuraEffect.js";
 import { clamp, rand, dist2 } from './utils.js';
 import BALANCE from './config/balance.js';
 import { tryCast as heroTryCast } from './hero.js';
+import { cvs, ctx, mini, mctx, DPR, world, screenToWorld, worldToScreen, clampCam, toPixel, drawShadow } from './camera.js';
+import { beep, playSfx } from './audio.js';
+import { initInput } from './input.js';
+import { weather, setWeather, drawWeather } from './weather.js';
 
 /* ==== Helpers ==== */
 state.rand = rand;
 
 /* ==== Canvas & camera ==== */
-const cvs = document.getElementById('game'), ctx = cvs.getContext('2d'); ctx.imageSmoothingEnabled = false;
-const mini = document.getElementById('minimap'), mctx = mini.getContext('2d'); mctx.imageSmoothingEnabled = false;
 globalThis.drawSprite = (name, x, y, scale = 1, override = {}) => drawSprite(ctx, name, x, y, { scale, override });
 globalThis.SPRITES_READY = false;
 await initSprites();
@@ -50,90 +52,14 @@ await Promise.all([
   initArchmageAtlas()
 ]);
 globalThis.SPRITES_READY = true;
-const DPR = Math.max(1, window.devicePixelRatio || 1);
-mini.width = Math.floor(mini.clientWidth * DPR);
-mini.height = Math.floor(mini.clientHeight * DPR);
-mctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-const world = { width: 12000, height: 8000, camX: 0, camY: 0, zoom: 1.25 };
-function resize() { const w = cvs.clientWidth, h = cvs.clientHeight; cvs.width = Math.floor(w * DPR); cvs.height = Math.floor(h * DPR); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
-new ResizeObserver(resize).observe(cvs); resize();
-function screenToWorld(sx, sy) { return { x: sx / world.zoom + world.camX, y: sy / world.zoom + world.camY }; }
-function worldToScreen(wx, wy) { return { x: (wx - world.camX) * world.zoom, y: (wy - world.camY) * world.zoom }; }
-function clampCam() {
-  const vw = cvs.width / DPR / world.zoom, vh = cvs.height / DPR / world.zoom;
-  world.camX = clamp(world.camX, 0, world.width - vw);
-  world.camY = clamp(world.camY, 0, world.height - vh);
-}
-cvs.addEventListener('wheel', e => {
-  e.preventDefault();
-  const wx = e.offsetX / world.zoom + world.camX;
-  const wy = e.offsetY / world.zoom + world.camY;
-  const nz = clamp(world.zoom * (e.deltaY < 0 ? 1.1 : 0.9), 0.6, 2.8);
-  world.camX = wx - e.offsetX / nz;
-  world.camY = wy - e.offsetY / nz;
-  world.zoom = nz;
-  clampCam();
-}, { passive: false });
-
-function toPixel(v) { return Math.round(v * DPR) / DPR; }
-function drawShadow(x, y, r) { ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(toPixel(x), toPixel(y), r, r * 0.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
 Object.assign(globalThis, { clamp, rand, dist2, cvs, ctx, mini, mctx, DPR, world, screenToWorld, worldToScreen, clampCam, toPixel, drawShadow });
 
 // provide a default isBlocked implementation until terrain initializes
 state.isBlocked = state.isBlocked || (() => false);
-
-/* ==== Audio (простые огибающие без внешних файлов) ==== */
-const AC = window.AudioContext ? new AudioContext() : null;
-function beep(freq = 440, dur = 0.08, type = 'triangle', gain = 0.06) {
-  if (state.muted || !AC) return;
-  const o = AC.createOscillator(), g = AC.createGain();
-  o.type = type; o.frequency.value = freq; o.connect(g); g.connect(AC.destination); g.gain.value = gain;
-  o.start(); g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + dur); o.stop(AC.currentTime + dur);
-}
 globalThis.beep = beep;
-
-function playSfx(name) {
-  if (state.muted || !AC) return;
-  if (name === 'denied') {
-    const o = AC.createOscillator(), g = AC.createGain();
-    o.type = 'sine';
-    o.frequency.value = 110;
-    o.connect(g); g.connect(AC.destination); g.gain.value = 0.08;
-    o.start();
-    g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + 0.25);
-    o.stop(AC.currentTime + 0.25);
-  }
-}
 globalThis.playSfx = playSfx;
 let simTime = 0;
 let gameOver = false;
-const weather = { type: 'sun', particles: [] };
-function setWeather(t) {
-  weather.type = t;
-  weather.particles.length = 0;
-  if (t === 'rain') {
-    for (let i = 0; i < 120; i++) weather.particles.push({ x: Math.random() * world.width, y: Math.random() * world.height });
-  }
-}
-function drawWeather(dt) {
-  if (weather.type === 'evening') {
-    ctx.fillStyle = 'rgba(255,180,100,0.08)';
-    ctx.fillRect(0, 0, cvs.width, cvs.height);
-  } else if (weather.type === 'rain') {
-    ctx.fillStyle = 'rgba(120,120,120,0.12)';
-    ctx.fillRect(0, 0, cvs.width, cvs.height);
-    ctx.strokeStyle = 'rgba(180,180,255,0.5)';
-    ctx.beginPath();
-    for (const p of weather.particles) {
-      const s = worldToScreen(p.x, p.y);
-      ctx.moveTo(s.x, s.y);
-      ctx.lineTo(s.x - 2 * world.zoom, s.y + 8 * world.zoom);
-      p.x -= 50 * dt; p.y += 200 * dt;
-      if (p.y > world.height) { p.y = 0; p.x = Math.random() * world.width; }
-    }
-    ctx.stroke();
-  }
-}
       const neutral = { units: [] }, drops = [], projectiles = [];
       state.neutral = neutral;
 
@@ -382,52 +308,9 @@ function drawWeather(dt) {
         if (casted && h.owner === 0) setHeroUI(h);
       }
 
-      /* ==== Input & selection ==== */
-      const buildTip = document.getElementById('buildTip');
-      const input = { x: 0, y: 0, wx: 0, wy: 0, keys: {}, buildMode: null, lastClickT: 0, lastClickType: null, lDown: false, rectStartX: 0, rectStartY: 0, rectStartWX: 0, rectStartWY: 0, rectSelecting: false };
-      cvs.addEventListener('mousemove', e => {
-        input.x = e.offsetX; input.y = e.offsetY; const w = screenToWorld(input.x, input.y); input.wx = w.x; input.wy = w.y;
-        if (input.lDown && !input.rectSelecting) {
-          if (Math.abs(e.offsetX - input.rectStartX) > 4 || Math.abs(e.offsetY - input.rectStartY) > 4) input.rectSelecting = true;
-        }
-      });
-      cvs.addEventListener('contextmenu', e => { e.preventDefault(); if (input.buildMode) { input.buildMode = null; buildTip.style.display = 'none'; } });
-      cvs.addEventListener('dragover', e => e.preventDefault());
-      cvs.addEventListener('drop', e => {
-        e.preventDefault();
-        const idx = e.dataTransfer.getData('text/plain');
-        const h = players[0].hero;
-        if (!h || !h.inventory[idx]) return;
-        const it = h.inventory[idx];
-        if (!it.startsWith('scroll_')) applyItem(h, it, true);
-        h.inventory.splice(idx, 1);
-        const w = screenToWorld(e.offsetX, e.offsetY);
-        drops.push(new ItemDrop(w.x, w.y, it));
-        renderInventory(h);
-      });
-      window.addEventListener('keydown', e => {
-        const k = e.key.toLowerCase();
-        input.keys[k] = true;
-        if (k === 'f') state.fogEnabled = !state.fogEnabled;
-        if (k === '1') tryCast(1);
-        if (k === '2') tryCast(2);
-        if (k === '3') tryCast(3);
-        const idx = ['q','e','r','g','t','y'].indexOf(k);
-        if (idx >= 0) {
-          const h = players[0].hero;
-          if (h && h.inventory[idx]) {
-            const it = h.inventory[idx];
-            if (it.startsWith('scroll_')) {
-              applyItem(h, it);
-              h.inventory.splice(idx, 1);
-              renderInventory(h);
-              flashSlot(idx);
-            } else { playSfx('denied'); }
-          } else { playSfx('denied'); }
-        }
-        if (k === 'r') { resumeWorkers(players[0]); }
-      });
-      window.addEventListener('keyup', e => { input.keys[e.key.toLowerCase()] = false; });
+        /* ==== Input & selection ==== */
+        const buildTip = document.getElementById('buildTip');
+        const input = initInput(cvs, screenToWorld);
 
       function entityAt(wx, wy) {
         function hit(arr, r) { let best = null, bD = 1e9; for (const e of arr) { if (e.dead) continue; const d = dist2(wx, wy, e.x, e.y); const rr = r(e); if (d <= rr * rr && d < bD) { bD = d; best = e; } } return best; }
@@ -579,7 +462,7 @@ function drawWeather(dt) {
       }
 
       /* ==== Utils ==== */
-      Object.assign(globalThis, { players, neutral, drops, projectiles, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes, canPlaceBuildingAt, placeGhost, enqueueUnit, trainUnit, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel, updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, getById, enemiesFor, Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, input, setHeroUI, spawnHero, applyItem });
+      Object.assign(globalThis, { drops, projectiles, riceNodes, waterNodes, COSTS, POP_CAP, resUI, updateRes, canPlaceBuildingAt, placeGhost, enqueueUnit, trainUnit, renderWorkerBuildPanel, updateBuildingPanel, resumeWorkers, statsPanel, updateStatsPanel, drawMinimap, allUnits, allStructures, nearestNode, lootFromTier, getById, enemiesFor, Unit, Structure, ResourceNode, ItemDrop, NeutralCreep, Projectile, input, setHeroUI, spawnHero, applyItem });
 
       await import("./ui.js");
 await import("./terrain.js");

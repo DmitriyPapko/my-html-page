@@ -1,4 +1,5 @@
 /* ==== Fog of war ==== */
+import state from './state.js';
 const F_W = 180, F_H = 120;
 const explored = new Uint8Array(F_W * F_H), visible = new Uint8Array(F_W * F_H);
 const fogCanvas = document.createElement('canvas');
@@ -72,16 +73,16 @@ function revealCircle(wx, wy, r) {
 }
 
 function isVisible(wx, wy) {
-  return !globalThis.fogEnabled || visible[fogIndex(wx, wy)] === 1;
+  return !state.fogEnabled || visible[fogIndex(wx, wy)] === 1;
 }
 
 function isExplored(wx, wy) {
-  return !globalThis.fogEnabled || explored[fogIndex(wx, wy)] === 1;
+  return !state.fogEnabled || explored[fogIndex(wx, wy)] === 1;
 }
 
 function drawFog() {
-  const { fogEnabled, cvs, ctx } = globalThis;
-  if (!fogEnabled) return;
+  const { cvs, ctx } = globalThis;
+  if (!state.fogEnabled) return;
   ctx.drawImage(fogCanvas, 0, 0, F_W, F_H, 0, 0, cvs.width, cvs.height);
 }
 

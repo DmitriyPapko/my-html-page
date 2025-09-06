@@ -3,19 +3,28 @@
   "version": "1.0.0",
   "description": "A simple static HTML page project.",
   "type": "module",
-  "main": "index.js",
   "scripts": {
-    "test": "node test/ai.test.js && node test/mp-regen.test.js && node test/hero-abilities.test.js && node test/effects.test.js"
+    "start": "node src/main.js",
+    "test": "node --test test",
+    "lint": "eslint src test"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/DmitriyPapko/my-html-page.git"
   },
-  "keywords": ["html", "static", "example"],
+  "keywords": [
+    "html",
+    "static",
+    "example"
+  ],
   "author": "Dmitriy Papko",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/DmitriyPapko/my-html-page/issues"
   },
-  "homepage": "https://github.com/DmitriyPapko/my-html-page#readme"
+  "homepage": "https://github.com/DmitriyPapko/my-html-page#readme",
+  "devDependencies": {
+    "eslint": "^8.57.1",
+    "jsdom": "^23.2.0"
+  }
 }
