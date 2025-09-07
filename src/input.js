@@ -58,8 +58,26 @@ export function setupInput(deps) {
     const c = [...riceNodes, ...waterNodes];
     return hit(a, e => e.radius + 10) || hit(b, e => e.radius + 14) || hit(c, e => e.radius) || null;
   }
-  function unselectAll() { for (const p of [players[0], players[1], players[2]]) { for (const u of p.units) u.selected = false; for (const s of p.structures) s.selected = false; } for (const n of neutral.units) n.selected = false; }
-  function selectSameTypeOnScreen(type) { const x1 = world.camX, y1 = world.camY, x2 = world.camX + cvs.width / DPR / world.zoom, y2 = world.camY + cvs.height / DPR / world.zoom; for (const u of players[0].units) { if (u.dead) continue; if (u.type === type) { if (u.x >= x1 && u.x <= x2 && u.y >= y1 && u.y <= y2) u.selected = true; } } }
+  function unselectAll() {
+    for (const p of [players[0], players[1], players[2]]) {
+      p.selectedUnit = null;
+      for (const u of p.units) u.selected = false;
+      for (const s of p.structures) s.selected = false;
+    }
+    for (const n of neutral.units) n.selected = false;
+  }
+  function selectSameTypeOnScreen(type) {
+    const x1 = world.camX, y1 = world.camY,
+      x2 = world.camX + cvs.width / DPR / world.zoom,
+      y2 = world.camY + cvs.height / DPR / world.zoom;
+    for (const u of players[0].units) {
+      if (u.dead) continue;
+      if (u.type === type) {
+        if (u.x >= x1 && u.x <= x2 && u.y >= y1 && u.y <= y2) u.selected = true;
+      }
+    }
+    players[0].selectedUnit = players[0].units.find(u => u.selected) || null;
+  }
 
   cvs.addEventListener('mousedown', e => {
     if (e.button === 0) {
@@ -83,7 +101,11 @@ export function setupInput(deps) {
         const x1 = Math.min(input.rectStartWX, input.wx), y1 = Math.min(input.rectStartWY, input.wy);
         const x2 = Math.max(input.rectStartWX, input.wx), y2 = Math.max(input.rectStartWY, input.wy);
         unselectAll();
-        for (const u of players[0].units) { if (u.dead) continue; if (u.x >= x1 && u.x <= x2 && u.y >= y1 && u.y <= y2) u.selected = true; }
+        for (const u of players[0].units) {
+          if (u.dead) continue;
+          if (u.x >= x1 && u.x <= x2 && u.y >= y1 && u.y <= y2) u.selected = true;
+        }
+        players[0].selectedUnit = players[0].units.find(u => u.selected) || null;
         input.rectSelecting = false;
         return;
       }
@@ -94,11 +116,25 @@ export function setupInput(deps) {
       }
       const hit = entityAt(input.wx, input.wy);
       const now = performance.now();
-      if (hit && hit.owner === 0 && hit.type) {
-        if (now - input.lastClickT < 300 && input.lastClickType === hit.type) { selectSameTypeOnScreen(hit.type); }
-        else { unselectAll(); hit.selected = true; }
-        input.lastClickType = hit.type; input.lastClickT = now;
-      } else { unselectAll(); }
+      if (hit && hit.owner === 0) {
+        if (hit.type) {
+          if (now - input.lastClickT < 300 && input.lastClickType === hit.type) {
+            selectSameTypeOnScreen(hit.type);
+          } else {
+            unselectAll();
+            hit.selected = true;
+            players[0].selectedUnit = hit;
+          }
+          input.lastClickType = hit.type;
+          input.lastClickT = now;
+        } else {
+          unselectAll();
+          hit.selected = true;
+          input.lastClickType = null;
+        }
+      } else {
+        unselectAll();
+      }
     }
   });
 
